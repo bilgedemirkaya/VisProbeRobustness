@@ -1,0 +1,113 @@
+# Custom Preset Example
+# Copy this file to ~/.visprobe/presets/ and modify as needed
+#
+# This example shows how to create a custom robustness test preset.
+# All fields marked with (required) must be present.
+
+# (required) Human-readable name
+name: Custom Robustness Test
+
+# (required) Brief description of what this preset tests
+description: Example custom preset for testing specific robustness scenarios
+
+# Threat model: environmental, adversarial, combined, or all
+threat_model: environmental
+threat_model_description: Custom environmental perturbations
+
+# (required) List of perturbation strategies
+strategies:
+  # Simple perturbation with min/max levels
+  - type: brightness
+    min_level: 0.6
+    max_level: 1.4
+
+  # Perturbation with additional parameters
+  - type: gaussian_blur
+    kernel_size: 5
+    min_level: 0.0
+    max_level: 2.0
+
+  # Noise perturbation
+  - type: gaussian_noise
+    min_level: 0.0
+    max_level: 0.03
+
+  # Compositional perturbation (combines multiple)
+  - type: compositional
+    name: dim_blurry
+    description: Simulates low-light with camera shake
+    components:
+      - type: brightness
+        level_range: [0.4, 0.7]
+      - type: gaussian_blur
+        level_range: [0.5, 1.5]
+
+  # Another compositional example
+  - type: compositional
+    name: noisy_compressed
+    description: Simulates low-quality transmission
+    components:
+      - type: gaussian_noise
+        level_range: [0.01, 0.03]
+      - type: jpeg_compression
+        level_range: [30, 60]
+
+# (required) Property to test
+# Options: label_constant, topk_stability, confidence_drop, l2_distance
+property: label_constant
+
+# Search budget (number of queries)
+search_budget: 1000
+
+# Compute cost: low, medium, high, very_high
+compute_cost: low
+
+# Use cases (optional, for documentation)
+use_cases:
+  - Testing specific deployment conditions
+  - Custom robustness scenarios
+  - Targeted perturbation testing
+
+# Estimated time (optional, for documentation)
+estimated_time: 5-10 minutes for 100 images
+
+# Dependencies (optional)
+# requires:
+#   - adversarial-robustness-toolbox
+
+# =============================================================================
+# Available Strategy Types
+# =============================================================================
+#
+# Natural perturbations (passive):
+#   - brightness: Brightness adjustment (level = multiplier)
+#   - contrast: Contrast adjustment (level = multiplier)
+#   - gamma: Gamma correction (level = gamma value)
+#   - gaussian_noise: Additive Gaussian noise (level = std)
+#   - gaussian_blur: Gaussian blur (level = sigma)
+#   - motion_blur: Motion blur (level = kernel size)
+#   - jpeg_compression: JPEG compression (level = quality 0-100)
+#   - saturation: Color saturation (level = multiplier)
+#   - rotation: Image rotation (level = degrees)
+#   - scale: Image scaling (level = scale factor)
+#   - translation: Image translation (level = fraction of image)
+#   - shear: Shear transformation (level = shear factor)
+#
+# Adversarial attacks (active) - requires ART:
+#   - fgsm: Fast Gradient Sign Method (level = epsilon)
+#   - pgd: Projected Gradient Descent (eps, max_iter, eps_step)
+#   - bim: Basic Iterative Method (eps, max_iter)
+#
+# Compositional:
+#   - compositional: Combines multiple strategies
+#     - Must have 'components' list
+#     - Each component uses 'level_range' instead of min/max_level
+#
+# =============================================================================
+# Property Options
+# =============================================================================
+#
+# - label_constant: Predicted label should not change
+# - topk_stability: Top-K predictions should remain stable
+# - confidence_drop: Confidence should not drop below threshold
+# - l2_distance: Output L2 distance should be below threshold

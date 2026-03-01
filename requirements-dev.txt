@@ -1,0 +1,29 @@
+# Development dependencies for VisProbe
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=3.0.0
+pytest-xdist>=2.5.0
+pytest-mock>=3.10.0
+
+# Code formatting and linting
+black>=22.0.0
+flake8>=4.0.0
+isort>=5.10.0
+
+# Type checking
+mypy>=0.950
+
+# Security
+bandit>=1.7.0
+safety>=2.0.0
+
+# Pre-commit hooks
+pre-commit>=2.20.0
+
+# Documentation (optional)
+sphinx>=4.5.0
+sphinx-rtd-theme>=1.0.0
+
+# Install main package in editable mode
+-e .

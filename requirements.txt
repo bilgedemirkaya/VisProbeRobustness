@@ -1,0 +1,21 @@
+# Core dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.19.0
+
+# Adversarial attacks
+adversarial-robustness-toolbox>=1.18.0
+robustbench>=1.1.0
+autoattack @ git+https://github.com/fra31/auto-attack
+
+# Dashboard/CLI
+streamlit>=1.28.0
+plotly>=5.17.0
+pandas>=2.0.0
+
+# Development (optional)
+pytest>=7.0.0
+black>=23.0.0
+
+# Optional dependencies
+altair>=4.2.0  # For enhanced visualizations

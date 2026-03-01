@@ -1,0 +1,44 @@
+# Image Corruption (Legacy Preset)
+# Tests robustness to noise, compression artifacts, and degradation
+
+name: Image Corruption (Legacy)
+description: Tests robustness to noise, compression artifacts, and degradation
+
+threat_model: environmental
+threat_model_description: Legacy corruption-focused subset of natural perturbations
+
+legacy: true
+migration_hint: Consider using 'natural' for broader coverage
+
+strategies:
+  - type: gaussian_noise
+    min_level: 0.0
+    max_level: 0.05
+
+  - type: jpeg_compression
+    min_level: 10
+    max_level: 100
+
+  - type: gaussian_blur
+    kernel_size: 5
+    min_level: 0.0
+    max_level: 2.0
+
+  - type: compositional
+    name: degraded_transmission
+    components:
+      - type: jpeg_compression
+        level_range: [10, 30]
+      - type: gaussian_noise
+        level_range: [0.03, 0.05]
+
+property: label_constant
+search_budget: 1200
+compute_cost: low
+
+use_cases:
+  - Lossy transmission
+  - Low-bandwidth scenarios
+  - Noisy sensors
+
+estimated_time: 6-10 minutes for 100 images

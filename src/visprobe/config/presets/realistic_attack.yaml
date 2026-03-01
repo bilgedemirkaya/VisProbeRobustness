@@ -1,0 +1,95 @@
+# Realistic Attack Scenarios Preset
+# Adversarial attacks exploiting suboptimal environmental conditions
+# KEY CONTRIBUTION: What standard tests miss!
+
+name: Realistic Attack Scenarios
+description: Adversarial attacks exploiting suboptimal environmental conditions
+
+threat_model: combined
+threat_model_description: Adversary waits for poor conditions, then uses small perturbations
+
+novelty: >
+  Standard robustness tests check natural and adversarial separately.
+  Real attackers are smarter: they wait for low-light, blur, or compression,
+  then use SMALLER adversarial perturbations that would fail on clean images.
+  A model robust to epsilon=8/255 FGSM on clean images may fail at epsilon=2/255
+  in low-light. This preset tests that critical blind spot.
+
+strategies:
+  # LOW-LIGHT + FGSM: Attacker waits for dim conditions
+  - type: compositional
+    name: lowlight_fgsm
+    description: Low-light conditions + small FGSM attack
+    threat_scenario: Attacker waits for dusk/night, uses tiny perturbation
+    components:
+      - type: brightness
+        level_range: [0.4, 0.7]
+      - type: fgsm
+        level_range: [0.0, 0.01569]  # 4/255
+
+  # MOTION BLUR + PGD: Moving camera/subject exploitation
+  - type: compositional
+    name: blur_pgd
+    description: Motion blur + small PGD attack
+    threat_scenario: Attacker targets fast-moving camera with tiny perturbation
+    components:
+      - type: gaussian_blur
+        level_range: [1.5, 3.0]
+      - type: pgd
+        eps: 0.00784  # 2/255
+        max_iter: 10
+
+  # COMPRESSION + FGSM: Network transmission exploitation
+  - type: compositional
+    name: compressed_fgsm
+    description: Heavy JPEG compression + small FGSM
+    threat_scenario: Attacker exploits lossy video/image transmission
+    components:
+      - type: jpeg_compression
+        level_range: [30, 50]
+      - type: fgsm
+        level_range: [0.0, 0.01569]
+
+  # TRIPLE THREAT: Multiple conditions + tiny perturbation
+  - type: compositional
+    name: triple_threat
+    description: Low-light + noise + tiny FGSM - the realistic nightmare
+    threat_scenario: Worst-case - poor conditions + imperceptible attack
+    components:
+      - type: brightness
+        level_range: [0.5, 0.7]
+      - type: gaussian_noise
+        level_range: [0.01, 0.03]
+      - type: fgsm
+        level_range: [0.0, 0.00784]  # 2/255
+
+  # CONTRAST + BIM: Reduced visibility exploitation
+  - type: compositional
+    name: lowcontrast_bim
+    description: Low contrast conditions + iterative attack
+    threat_scenario: Attacker exploits hazy/foggy conditions
+    components:
+      - type: contrast
+        level_range: [0.5, 0.7]
+      - type: bim
+        eps: 0.01176  # 3/255
+        max_iter: 5
+
+property: label_constant
+search_budget: 2500
+compute_cost: high
+
+use_cases:
+  - Security-critical deployments
+  - Autonomous vehicle testing
+  - Surveillance system hardening
+  - Real-world attack simulation
+
+estimated_time: 20-30 minutes for 100 images
+
+requires:
+  - adversarial-robustness-toolbox
+
+critical_insight: >
+  If realistic_attack score << min(natural, adversarial),
+  the model has a critical blind spot to opportunistic attacks.

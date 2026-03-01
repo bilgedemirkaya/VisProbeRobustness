@@ -1,0 +1,104 @@
+# Comprehensive Robustness Benchmark Preset
+# Complete robustness evaluation across all threat models
+
+name: Comprehensive Robustness Benchmark
+description: Complete robustness evaluation across all threat models
+
+threat_model: all
+threat_model_description: Tests passive, active, and combined threat models
+
+strategies:
+  # --- NATURAL (Passive) ---
+  - type: brightness
+    min_level: 0.5
+    max_level: 1.5
+    category: natural
+
+  - type: contrast
+    min_level: 0.6
+    max_level: 1.4
+    category: natural
+
+  - type: gaussian_blur
+    kernel_size: 5
+    min_level: 0.0
+    max_level: 3.0
+    category: natural
+
+  - type: gaussian_noise
+    min_level: 0.0
+    max_level: 0.05
+    category: natural
+
+  - type: jpeg_compression
+    min_level: 20
+    max_level: 100
+    category: natural
+
+  - type: compositional
+    name: low_light_blur
+    category: natural
+    components:
+      - type: brightness
+        level_range: [0.4, 0.7]
+      - type: gaussian_blur
+        level_range: [1.0, 2.0]
+
+  # --- ADVERSARIAL (Active) ---
+  - type: fgsm
+    min_level: 0.0
+    max_level: 0.03137  # 8/255
+    category: adversarial
+
+  - type: pgd
+    eps: 0.03137  # 8/255
+    max_iter: 20
+    min_level: 0.0
+    max_level: 0.03137
+    category: adversarial
+
+  # --- REALISTIC ATTACK (Active + Environmental) ---
+  - type: compositional
+    name: lowlight_fgsm
+    category: realistic_attack
+    components:
+      - type: brightness
+        level_range: [0.4, 0.7]
+      - type: fgsm
+        level_range: [0.0, 0.01569]
+
+  - type: compositional
+    name: blur_pgd
+    category: realistic_attack
+    components:
+      - type: gaussian_blur
+        level_range: [1.5, 3.0]
+      - type: pgd
+        eps: 0.00784
+        max_iter: 10
+
+  - type: compositional
+    name: compressed_fgsm
+    category: realistic_attack
+    components:
+      - type: jpeg_compression
+        level_range: [30, 50]
+      - type: fgsm
+        level_range: [0.0, 0.01569]
+
+property: label_constant
+search_budget: 5000
+compute_cost: very_high
+
+use_cases:
+  - Research benchmarking
+  - Complete model evaluation
+  - Publication-ready results
+  - Comparing architectures
+
+estimated_time: 45-60 minutes for 100 images
+
+requires:
+  - adversarial-robustness-toolbox
+
+outputs_threat_breakdown: true
