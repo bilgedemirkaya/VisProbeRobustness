@@ -42,9 +42,9 @@ setup(
     ],
 
     extras_require={
-        "dev": ["pytest>=7.0.0", "black>=23.0.0"],
         "viz": ["altair>=4.2.0"],
         "adversarial": ["adversarial-robustness-toolbox>=1.18.0"],
+        "bayesian": ["scipy>=1.9.0", "scikit-learn>=1.0.0"],
         "all": [
             "altair>=4.2.0",
             "adversarial-robustness-toolbox>=1.18.0",

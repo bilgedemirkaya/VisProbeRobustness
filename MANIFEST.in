@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include src/visprobe *.py
+recursive-include src/visprobe/config *.yaml *.json
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+global-exclude *.pyc
+global-exclude .DS_Store
