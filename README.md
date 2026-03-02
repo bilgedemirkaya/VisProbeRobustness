@@ -1,8 +1,14 @@
 # VisProbe
 
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Find robustness failures in your vision models in 5 minutes.**
 
 VisProbe is a property-based testing framework for vision models. Instead of manually crafting test cases, you tell VisProbe what robustness properties matter (e.g., "predictions should be stable under blur") and it automatically finds where your model breaks.
+
+📚 [Documentation](docs/) | 🚀 [Quickstart](docs/quickstart.md) | 📖 [User Guide](docs/user-guide.md) | 🔧 [API Reference](docs/api-reference.md) | 💡 [Examples](examples/)
 
 ## Installation
 
