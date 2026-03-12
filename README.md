@@ -98,121 +98,234 @@ list_presets(verbose=True)
 
 ### 2. Adaptive threshold search
 
-VisProbe doesn't just test fixed perturbation levels—it finds the exact threshold where your model starts failing:
+VisProbe automatically finds the exact threshold where your model fails:
 
 ```python
+# Finds failure point efficiently (typically 5-10 evaluations)
 report = search(model, data, perturbation="gaussian_noise")
 
-# Output:
-# Failure threshold: 0.087
-# This means: model is robust up to σ=0.087, fails beyond that
+# Uses adaptive search by default, but you can choose:
+report = search(model, data, perturbation="gaussian_blur",
+                search_method="binary")  # or "adaptive", "bayesian"
 ```
 
-### 3. Adversarial attacks
+### 3. Property-based testing
 
-Test against FGSM, PGD, and other attacks (requires `adversarial-robustness-toolbox`):
+Define custom properties your model should satisfy:
 
 ```python
-from visprobe.strategies.adversarial import FGSMStrategy
+from visprobe.properties import ClassificationProperty
 
-report = search(
-    model=model,
-    data=test_data,
-    strategy=lambda eps: FGSMStrategy(eps=eps),
-    level_lo=0.0,
-    level_hi=0.03,  # 8/255 is standard
-    normalization="imagenet",
+# Test if model maintains top-1 prediction
+property = ClassificationProperty(
+    name="top1_maintained",
+    test_fn=lambda original, perturbed: original.argmax() == perturbed.argmax(),
+    threshold=0.95  # 95% of samples should maintain prediction
 )
+
+report = search(model, data, perturbation="brightness", property=property)
 ```
 
-### 4. Automatic normalization handling
+### 4. Multiple search methods
 
-VisProbe handles the tricky denormalize→perturb→renormalize workflow:
+- **Adaptive** (default): Fast, good for unknown ranges
+- **Binary**: Efficient for known ranges
+- **Bayesian**: Query-efficient, provides confidence intervals
 
 ```python
-# Just tell it your normalization scheme
-report = search(model, data, perturbation="blur", normalization="imagenet")
-report = search(model, data, perturbation="blur", normalization="cifar10")
+# Adaptive search (default)
+report = search(model, data, perturbation="gaussian_noise",
+                search_method="adaptive")
 
-# Or use custom normalization
-report = search(model, data, perturbation="blur",
-                normalization={"mean": [0.5, 0.5, 0.5], "std": [0.5, 0.5, 0.5]})
+# Binary search for known ranges
+report = search(model, data, perturbation="brightness",
+                search_method="binary", level_lo=0.5, level_hi=1.5)
+
+# Bayesian optimization for expensive evaluations
+report = search(model, data, perturbation="pgd_attack",
+                search_method="bayesian", n_iterations=10)
 ```
 
-### 5. Multiple search strategies
+### 5. Detailed reporting
 
 ```python
-# Adaptive (default) - fast, good for unknown ranges
-report = search(model, data, perturbation="blur", search_method="adaptive")
+# Rich information about failures
+print(report)  # Summary statistics
 
-# Binary - efficient when you know the range
-report = search(model, data, perturbation="blur", search_method="binary")
+# Access detailed metrics
+print(f"Failure threshold: {report.metrics['failure_threshold']}")
+print(f"Samples tested: {report.metrics['samples_tested']}")
+print(f"Failure rate at threshold: {report.metrics['failure_rate']}")
 
-# Bayesian - query-efficient, gives confidence intervals
-report = search(model, data, perturbation="blur", search_method="bayesian")
-```
+# Save for later analysis
+report.save("resnet50_blur_analysis.json")
 
-## CLI Usage
-
-```bash
-# Run tests and launch interactive dashboard
-visprobe run test_my_model.py
-
-# Visualize existing results
-visprobe visualize test_my_model.py
+# Interactive visualization
+report.show()  # Opens browser dashboard
 ```
 
 ## Available Perturbations
 
 ```python
 from visprobe import list_perturbations
+
 list_perturbations()
+
+# Vision perturbations:
+# - gaussian_blur, motion_blur, defocus_blur
+# - gaussian_noise, shot_noise, impulse_noise
+# - brightness, contrast, saturation
+# - rotation, translation, scale
+# - jpeg_compression, pixelate
+
+# Adversarial attacks:
+# - fgsm, pgd, carlini_wagner
+# - boundary_attack, hop_skip_jump
 ```
 
-| Perturbation | Description |
-|-------------|-------------|
-| `gaussian_noise` | Additive Gaussian noise |
-| `gaussian_blur` | Gaussian blur filter |
-| `motion_blur` | Directional motion blur |
-| `brightness_increase` | Increase brightness |
-| `brightness_decrease` | Decrease brightness |
-| `contrast_increase` | Increase contrast |
-| `contrast_decrease` | Decrease contrast |
-| `rotation` | Image rotation |
-| `gamma_bright` | Gamma correction (brighter) |
-| `gamma_dark` | Gamma correction (darker) |
-| `jpeg_compression` | JPEG compression artifacts |
+## Examples
 
-## How It Works
+### Testing multiple models
 
-1. **Filter to correct samples**: Only tests samples your model classifies correctly
-2. **Apply perturbations**: Gradually increases perturbation strength
-3. **Find failure threshold**: Uses adaptive search to find where predictions flip
-4. **Report results**: Tells you exactly how robust (or fragile) your model is
+```python
+models = {
+    "ResNet50": models.resnet50(pretrained=True),
+    "ViT": models.vit_b_16(pretrained=True),
+    "EfficientNet": models.efficientnet_b0(pretrained=True),
+}
 
-## Key Concepts
+for name, model in models.items():
+    report = search(model, test_data, preset="natural")
+    print(f"{name}: {report.score:.1f}%")
+```
 
-**Robustness Score**: Percentage of the perturbation range where model maintains correct predictions. Higher = more robust.
+### Custom perturbation ranges
 
-**Failure Threshold**: The perturbation level where model starts making mistakes. For blur, this might be σ=2.5. For noise, maybe 0.08.
+```python
+from visprobe.strategies import GaussianNoiseStrategy
 
-**Pass Threshold**: By default, model "passes" a perturbation level if 90% of samples remain correct. Configurable via `pass_threshold` parameter.
+# Fine control over perturbation strength
+report = search(
+    model=model,
+    data=test_data,
+    strategy=lambda level: GaussianNoiseStrategy(std_dev=level),
+    level_lo=0.0,
+    level_hi=0.5,
+    search_method="adaptive"
+)
+```
 
-## Tips
+### CI/CD Integration
 
-- **Start with 100 samples** - fast enough for iteration, representative enough for real insights
-- **Use presets first** - they have sensible defaults for common scenarios
-- **Check class distribution** - make sure your test samples cover diverse classes
-- **Save reports** - call `report.save()` to persist results for the dashboard
+```python
+# Run in test suite
+def test_model_robustness():
+    report = search(model, test_data, preset="natural")
+    assert report.score > 70.0, f"Model too fragile: {report.score:.1f}%"
+```
 
-## Requirements
+## Advanced Usage
 
-- Python 3.9+
-- PyTorch
-- torchvision (for transforms)
-- tqdm (for progress bars)
-- adversarial-robustness-toolbox (optional, for adversarial attacks)
+### Compositional testing (multiple perturbations)
+
+```python
+from visprobe.strategies import CompositeStrategy
+
+# Test blur + noise together
+strategy = CompositeStrategy([
+    GaussianBlurStrategy(kernel_size=5),
+    GaussianNoiseStrategy(std_dev=0.1)
+])
+
+report = search(model, data, strategy=strategy)
+```
+
+### Custom properties
+
+```python
+def confidence_maintained(original_output, perturbed_output):
+    """Check if confidence doesn't drop too much"""
+    original_conf = torch.softmax(original_output, dim=-1).max()
+    perturbed_conf = torch.softmax(perturbed_output, dim=-1).max()
+    return perturbed_conf > original_conf * 0.8
+
+property = ClassificationProperty(
+    name="confidence_maintained",
+    test_fn=confidence_maintained,
+    threshold=0.9
+)
+
+report = search(model, data, perturbation="gaussian_blur", property=property)
+```
+
+## Advanced Analysis Module
+
+VisProbe includes a comprehensive analysis module for deep insights into model behavior:
+
+### Key Features
+
+- **Per-sample tracking**: Know exactly which samples failed and why
+- **Statistical confidence**: Bootstrap confidence intervals for rigorous comparison
+- **Crossover detection**: Find where models exchange performance rankings
+- **Disagreement analysis**: Identify complementary models for ensembles
+- **Confidence profiling**: Detect overconfidence and calibration issues
+- **Vulnerability analysis**: Find systematically vulnerable classes
+
+### Quick Example
+
+```python
+from visprobe.analysis import (
+    evaluate_detailed,
+    bootstrap_accuracy,
+    confidence_profile,
+    class_vulnerability,
+)
+
+# Detailed evaluation with per-sample tracking
+results = evaluate_detailed(model, images, labels, scenario="gaussian_noise")
+
+# Get statistical confidence
+acc, lower, upper = bootstrap_accuracy(results.correct_mask)
+print(f"Accuracy: {acc:.1%} (95% CI: [{lower:.1%}, {upper:.1%}])")
+
+# Check if model is overconfident
+profile = confidence_profile(results.samples)
+if profile.pct_high_confidence_errors > 30:
+    print("⚠️ Model is overconfident on errors!")
+
+# Find vulnerable classes
+vulnerable = class_vulnerability(clean_results, noisy_results, top_k=5)
+for vuln in vulnerable:
+    print(f"{vuln.class_name}: {vuln.accuracy_drop:.0%} drop")
+```
+
+See [examples/advanced_analysis_example.py](examples/advanced_analysis_example.py) for comprehensive usage.
+
+## Architecture
+
+VisProbe follows a modular design:
+
+- **Core**: Adaptive search engine that efficiently finds failure thresholds
+- **Strategies**: Perturbation implementations (blur, noise, attacks, etc.)
+- **Properties**: Invariants that models should maintain
+- **Presets**: Common test scenarios
+- **Report**: Rich analysis and visualization
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Citation
+
+```bibtex
+@software{visprobe2024,
+  title={VisProbe: Property-Based Testing for Vision Models},
+  author={...},
+  year={2024},
+  url={https://github.com/visprobe/visprobe}
+}
+```
 
 ## License
 
-MIT
+MIT License. See [LICENSE](LICENSE) for details.
