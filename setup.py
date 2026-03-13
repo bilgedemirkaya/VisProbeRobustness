@@ -39,6 +39,9 @@ setup(
         "plotly>=5.17.0",
         "pandas>=2.0.0",
         "pillow>=8.0.0",
+        "scipy>=1.9.0",
+        "matplotlib>=3.5.0",
+        "seaborn>=0.11.0",
     ],
 
     extras_require={

@@ -1,31 +1,24 @@
 """
-Advanced decorator-based API for VisProbe (for power users).
+Advanced API for VisProbe (for power users).
 
-See README.md for migration guide.
-
-The decorator API remains available for power users who need fine-grained control.
+This module provides advanced access to internal components for power users
+who need fine-grained control over the testing process.
 """
 
-import warnings
+# Re-export the main search function and Report
+from ..api import search
+from ..report import Report
 
-
-# Import decorator API from main package
-from ..api import (
-    ImageData,
-    PerturbationInfo,
-    Report,
-    data_source,
-    given,
-    model,
-    search,
-)
+# Re-export strategy and property classes for advanced usage
+from ..strategies import *
+from ..properties import *
+from ..core.search_engine import SearchEngine
+from ..core.search_strategies import AdaptiveSearchStrategy, BinarySearchStrategy
 
 __all__ = [
-    "given",
-    "model",
-    "data_source",
     "search",
     "Report",
-    "ImageData",
-    "PerturbationInfo",
+    "SearchEngine",
+    "AdaptiveSearchStrategy",
+    "BinarySearchStrategy",
 ]

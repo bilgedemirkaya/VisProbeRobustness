@@ -47,7 +47,7 @@ from .perturbations import list_perturbations, get_perturbation, Perturbation
 from .presets import list_presets as _list_presets_raw, get_preset_info
 
 # Modules
-from . import presets, properties, strategies
+from . import presets, properties, strategies, analysis
 
 
 # Preset discovery wrapper for cleaner output
