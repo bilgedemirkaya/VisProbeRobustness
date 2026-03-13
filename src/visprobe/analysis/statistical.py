@@ -174,6 +174,68 @@ def bootstrap_confidence_interval(
     return statistic, lower_bound, upper_bound
 
 
+def bootstrap_protection_gap(
+    clean_correct: np.ndarray,
+    robust_correct: np.ndarray,
+    n_bootstrap: int = 10000,
+    confidence_level: float = 0.95,
+    random_state: Optional[int] = None
+) -> Tuple[float, float, float]:
+    """
+    Compute bootstrap confidence interval for protection gap (clean - robust accuracy).
+
+    The protection gap measures how much accuracy drops under adversarial/perturbation
+    conditions compared to clean conditions. A larger gap indicates lower robustness.
+
+    Args:
+        clean_correct: Boolean array of correct predictions on clean samples
+        robust_correct: Boolean array of correct predictions on perturbed samples
+        n_bootstrap: Number of bootstrap samples
+        confidence_level: Confidence level (default 95%)
+        random_state: Random seed for reproducibility
+
+    Returns:
+        Tuple of (mean_gap, lower_bound, upper_bound)
+
+    Example:
+        >>> gap, lower, upper = bootstrap_protection_gap(clean_results, robust_results)
+        >>> print(f"Protection Gap: {gap:.1%} (95% CI: {lower:.1%} to {upper:.1%})")
+        >>> if gap > 0.1:
+        ...     print("Model has significant robustness issues")
+    """
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    if len(clean_correct) != len(robust_correct):
+        raise ValueError("Clean and robust arrays must have same length (paired samples)")
+
+    n_samples = len(clean_correct)
+    bootstrap_gaps = []
+
+    for _ in range(n_bootstrap):
+        # Resample pairs to maintain correspondence
+        indices = np.random.choice(n_samples, size=n_samples, replace=True)
+        clean_sample = clean_correct[indices]
+        robust_sample = robust_correct[indices]
+
+        # Protection gap = clean accuracy - robust accuracy
+        gap = clean_sample.mean() - robust_sample.mean()
+        bootstrap_gaps.append(gap)
+
+    bootstrap_gaps = np.array(bootstrap_gaps)
+
+    # Calculate confidence interval
+    alpha = 1 - confidence_level
+    lower_percentile = (alpha / 2) * 100
+    upper_percentile = (1 - alpha / 2) * 100
+
+    mean_gap = clean_correct.mean() - robust_correct.mean()
+    lower_bound = np.percentile(bootstrap_gaps, lower_percentile)
+    upper_bound = np.percentile(bootstrap_gaps, upper_percentile)
+
+    return mean_gap, lower_bound, upper_bound
+
+
 def mcnemar_test(
     correct_mask_a: np.ndarray,
     correct_mask_b: np.ndarray

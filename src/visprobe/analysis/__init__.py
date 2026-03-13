@@ -22,10 +22,14 @@ from .detailed_evaluation import (
     get_successes,
 )
 
+# Alias for backward compatibility
+EvaluationResult = DetailedResults
+
 from .statistical import (
     bootstrap_accuracy,
     bootstrap_delta,
     bootstrap_confidence_interval,
+    bootstrap_protection_gap,
 )
 
 from .crossover import (
@@ -47,6 +51,9 @@ from .confidence import (
     reliability_diagram,
 )
 
+# Alias for backward compatibility / common usage
+expected_calibration_error = calibration_error
+
 from .vulnerability import (
     ClassVulnerability,
     class_vulnerability,
@@ -65,6 +72,7 @@ __all__ = [
     # Detailed evaluation
     'SampleResult',
     'DetailedResults',
+    'EvaluationResult',  # Alias for DetailedResults
     'evaluate_detailed',
     'get_failures',
     'get_successes',
@@ -73,6 +81,7 @@ __all__ = [
     'bootstrap_accuracy',
     'bootstrap_delta',
     'bootstrap_confidence_interval',
+    'bootstrap_protection_gap',
 
     # Crossover detection
     'CrossoverPoint',
@@ -88,6 +97,7 @@ __all__ = [
     'ConfidenceProfile',
     'confidence_profile',
     'calibration_error',
+    'expected_calibration_error',  # Alias for calibration_error
     'reliability_diagram',
 
     # Vulnerability analysis
