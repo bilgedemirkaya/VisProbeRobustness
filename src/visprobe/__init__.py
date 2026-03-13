@@ -116,4 +116,5 @@ __all__ = [
     "properties",
     "strategies",
     "presets",
+    "analysis",
 ]
