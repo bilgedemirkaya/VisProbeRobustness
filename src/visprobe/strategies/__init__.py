@@ -49,6 +49,16 @@ from .spatial import ElasticDeform, Rotation, Scale, Shear, Translation
 # Composition strategies
 from .composition import Blend, Compose, LevelTransform, LowLightBlur, RandomChoice
 
+# Severity mapping utilities
+from .severity import (
+    brightness_reduction,
+    gaussian_blur_severity,
+    gaussian_noise_severity,
+    linear_scale,
+    lowlight_severity,
+    with_severity,
+)
+
 
 # ============================================================================
 # Exports
@@ -97,4 +107,11 @@ __all__ = [
     "Blend",
     "LowLightBlur",
     "LevelTransform",
+    # Severity mapping utilities
+    "with_severity",
+    "linear_scale",
+    "brightness_reduction",
+    "gaussian_blur_severity",
+    "gaussian_noise_severity",
+    "lowlight_severity",
 ]
