@@ -36,6 +36,8 @@ class DetailedResults:
     accuracy: float
     correct_mask: np.ndarray
     total_samples: int
+    mean_confidence: float = 0.0  # Mean prediction confidence
+    mean_loss: float = 0.0  # Mean cross-entropy loss
     metadata: Optional[Dict[str, Any]] = None
 
     def get_failures(self) -> List[SampleResult]:
@@ -80,7 +82,8 @@ def evaluate_detailed(
     scenario: str = "default",
     device: Optional[str] = None,
     batch_size: int = 32,
-    top_k: int = 5
+    top_k: int = 5,
+    **kwargs  # Accept extra arguments for compatibility
 ) -> DetailedResults:
     """
     Perform detailed evaluation with per-sample tracking.
@@ -113,6 +116,8 @@ def evaluate_detailed(
 
     samples = []
     correct_list = []
+    confidence_list = []
+    loss_list = []
 
     with torch.no_grad():
         for i in range(0, len(images), batch_size):
@@ -128,6 +133,9 @@ def evaluate_detailed(
 
             # Get top-k predictions
             top_k_probs, top_k_preds = probs.topk(min(top_k, probs.shape[1]), dim=1)
+
+            # Compute loss
+            losses = F.cross_entropy(outputs, batch_labels, reduction='none')
 
             # Process each sample
             for j in range(len(batch_images)):
@@ -147,9 +155,23 @@ def evaluate_detailed(
 
                 samples.append(sample)
                 correct_list.append(correct)
+                confidence_list.append(confidences[j].item())
+                loss_list.append(losses[j].item())
 
     correct_mask = np.array(correct_list)
     accuracy = correct_mask.mean()
+    mean_confidence = float(np.mean(confidence_list))
+    mean_loss = float(np.mean(loss_list))
+
+    # Build metadata
+    metadata = {
+        'device': str(device),
+        'batch_size': batch_size,
+        'top_k': top_k,
+    }
+
+    # Add any extra kwargs to metadata (e.g., severity, eps from workflows)
+    metadata.update(kwargs)
 
     return DetailedResults(
         model_name=model_name,
@@ -158,11 +180,9 @@ def evaluate_detailed(
         accuracy=accuracy,
         correct_mask=correct_mask,
         total_samples=len(samples),
-        metadata={
-            'device': str(device),
-            'batch_size': batch_size,
-            'top_k': top_k,
-        }
+        mean_confidence=mean_confidence,
+        mean_loss=mean_loss,
+        metadata=metadata
     )
 
 

@@ -120,7 +120,7 @@ class SeveritySweep:
                 device=self.device,
                 model_name=model_name,
                 scenario=f"{scenario}_s{severity:.2f}",
-                severity=severity,
+                severity=severity,  # Stored in metadata
             )
 
             results.append(result)
@@ -299,8 +299,8 @@ class CompositionalTest(SeveritySweep):
                 device=self.device,
                 model_name=model_name,
                 scenario=f"{scenario}_s{severity:.2f}_eps{eps:.4f}",
-                severity=severity,
-                eps=eps,
+                severity=severity,  # Stored in metadata
+                eps=eps,  # Stored in metadata
             )
 
             results.append(result)
