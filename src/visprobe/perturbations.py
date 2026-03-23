@@ -1,292 +1,404 @@
 """
-Perturbation catalog with sensible defaults.
-
-Provides a high-level API for common perturbations without requiring users
-to know parameter ranges, strategy construction, or normalization details.
+Simplified environmental perturbations for vision models.
+Clean, transparent implementations without hidden complexity.
 """
 
-from dataclasses import dataclass
-from typing import Callable, Dict, Optional, Tuple
-
-from .strategies.base import Strategy
-from .strategies.image import (
-    BrightnessStrategy,
-    ContrastStrategy,
-    GammaStrategy,
-    GaussianBlurStrategy,
-    GaussianNoiseStrategy,
-    JPEGCompressionStrategy,
-    MotionBlurStrategy,
-    RotateStrategy,
-)
+import torch
+import torch.nn.functional as F
+from typing import Optional, Dict, Callable
+import numpy as np
 
 
-@dataclass
-class PerturbationSpec:
-    """Specification for a perturbation type."""
+class GaussianBlur:
+    """Gaussian blur perturbation."""
 
-    name: str
-    """Human-readable name"""
+    def __init__(self, sigma_max: float = 3.0):
+        """
+        Initialize Gaussian blur.
 
-    strategy_class: type
-    """Strategy class to instantiate"""
+        Args:
+            sigma_max: Maximum sigma value at severity=1.0
+        """
+        self.sigma_max = sigma_max
 
-    param_name: str
-    """Parameter name that varies with level"""
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Apply Gaussian blur.
 
-    default_range: Tuple[float, float]
-    """Default (level_lo, level_hi) for search"""
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1]
 
-    imagenet_range: Optional[Tuple[float, float]] = None
-    """ImageNet-specific range (if different from default)"""
+        Returns:
+            Blurred images
+        """
+        if severity <= 0:
+            return images
 
-    cifar_range: Optional[Tuple[float, float]] = None
-    """CIFAR-specific range (if different from default)"""
+        sigma = severity * self.sigma_max
 
-    description: str = ""
-    """Brief description of the perturbation"""
+        # Create Gaussian kernel
+        kernel_size = int(2 * np.ceil(3 * sigma) + 1)
+        if kernel_size % 2 == 0:
+            kernel_size += 1
 
-    def get_range(self, preset: Optional[str] = None) -> Tuple[float, float]:
-        """Get appropriate range based on dataset preset."""
-        if preset == "imagenet" and self.imagenet_range:
-            return self.imagenet_range
-        elif preset in ("cifar10", "cifar100") and self.cifar_range:
-            return self.cifar_range
-        return self.default_range
+        # Generate 1D Gaussian kernel
+        x = torch.arange(kernel_size, dtype=images.dtype, device=images.device)
+        x = x - kernel_size // 2
+        kernel_1d = torch.exp(-0.5 * (x / sigma) ** 2)
+        kernel_1d = kernel_1d / kernel_1d.sum()
 
-    def create_factory(self) -> Callable[[float], Strategy]:
-        """Create a strategy factory function."""
-        param_name = self.param_name
-        strategy_class = self.strategy_class
+        # Create 2D kernel
+        kernel_2d = kernel_1d.unsqueeze(0) * kernel_1d.unsqueeze(1)
+        kernel_2d = kernel_2d.unsqueeze(0).unsqueeze(0)
 
-        def factory(level: float) -> Strategy:
-            return strategy_class(**{param_name: level})
+        # Apply blur per channel
+        channels = images.shape[1]
+        kernel_2d = kernel_2d.repeat(channels, 1, 1, 1)
 
-        return factory
+        # Apply convolution with padding
+        padding = kernel_size // 2
+        blurred = F.conv2d(
+            images,
+            kernel_2d,
+            padding=padding,
+            groups=channels
+        )
 
-
-# Perturbation catalog with sensible defaults
-PERTURBATIONS: Dict[str, PerturbationSpec] = {
-    # Noise perturbations
-    "gaussian_noise": PerturbationSpec(
-        name="Gaussian Noise",
-        strategy_class=GaussianNoiseStrategy,
-        param_name="std_dev",
-        default_range=(0.0, 0.15),
-        imagenet_range=(0.0, 0.12),
-        cifar_range=(0.0, 0.15),
-        description="Additive Gaussian noise in pixel space",
-    ),
-
-    # Blur perturbations
-    "gaussian_blur": PerturbationSpec(
-        name="Gaussian Blur",
-        strategy_class=GaussianBlurStrategy,
-        param_name="sigma",
-        default_range=(0.0, 3.0),
-        imagenet_range=(0.0, 10.0),  # Expanded to find actual failure point
-        cifar_range=(0.0, 2.5),
-        description="Gaussian blur filter",
-    ),
-
-    "motion_blur": PerturbationSpec(
-        name="Motion Blur",
-        strategy_class=MotionBlurStrategy,
-        param_name="kernel_size",
-        default_range=(3.0, 25.0),
-        imagenet_range=(3.0, 31.0),
-        cifar_range=(3.0, 21.0),
-        description="Directional motion blur",
-    ),
-
-    # Brightness perturbations
-    "brightness_increase": PerturbationSpec(
-        name="Brightness (Brighter)",
-        strategy_class=BrightnessStrategy,
-        param_name="brightness_factor",
-        default_range=(1.0, 2.0),
-        imagenet_range=(1.0, 2.5),
-        cifar_range=(1.0, 2.0),
-        description="Increase image brightness",
-    ),
-
-    "brightness_decrease": PerturbationSpec(
-        name="Brightness (Darker)",
-        strategy_class=BrightnessStrategy,
-        param_name="brightness_factor",
-        default_range=(0.2, 1.0),
-        imagenet_range=(0.1, 1.0),
-        cifar_range=(0.3, 1.0),
-        description="Decrease image brightness",
-    ),
-
-    # Contrast perturbations
-    "contrast_increase": PerturbationSpec(
-        name="Contrast (Higher)",
-        strategy_class=ContrastStrategy,
-        param_name="contrast_factor",
-        default_range=(1.0, 2.5),
-        imagenet_range=(1.0, 3.0),
-        cifar_range=(1.0, 2.0),
-        description="Increase image contrast",
-    ),
-
-    "contrast_decrease": PerturbationSpec(
-        name="Contrast (Lower)",
-        strategy_class=ContrastStrategy,
-        param_name="contrast_factor",
-        default_range=(0.2, 1.0),
-        imagenet_range=(0.1, 1.0),
-        cifar_range=(0.3, 1.0),
-        description="Decrease image contrast",
-    ),
-
-    # Gamma correction
-    "gamma_bright": PerturbationSpec(
-        name="Gamma (Brighter)",
-        strategy_class=GammaStrategy,
-        param_name="gamma",
-        default_range=(0.3, 1.0),
-        imagenet_range=(0.2, 1.0),
-        cifar_range=(0.4, 1.0),
-        description="Gamma correction (darker to neutral)",
-    ),
-
-    "gamma_dark": PerturbationSpec(
-        name="Gamma (Darker)",
-        strategy_class=GammaStrategy,
-        param_name="gamma",
-        default_range=(1.0, 3.0),
-        imagenet_range=(1.0, 3.5),
-        cifar_range=(1.0, 2.5),
-        description="Gamma correction (neutral to darker)",
-    ),
-
-    # Geometric perturbations
-    "rotation": PerturbationSpec(
-        name="Rotation",
-        strategy_class=RotateStrategy,
-        param_name="angle",
-        default_range=(0.0, 45.0),
-        imagenet_range=(0.0, 60.0),
-        cifar_range=(0.0, 45.0),
-        description="Rotation in degrees",
-    ),
-
-    # Compression artifacts
-    "jpeg_compression": PerturbationSpec(
-        name="JPEG Compression",
-        strategy_class=JPEGCompressionStrategy,
-        param_name="quality",
-        default_range=(10.0, 100.0),
-        imagenet_range=(5.0, 100.0),
-        cifar_range=(10.0, 100.0),
-        description="JPEG compression quality degradation",
-    ),
-}
+        return blurred
 
 
-def list_perturbations() -> Dict[str, str]:
+class GaussianNoise:
+    """Gaussian noise perturbation."""
+
+    def __init__(self, std_max: float = 0.1, seed: Optional[int] = None):
+        """
+        Initialize Gaussian noise.
+
+        Args:
+            std_max: Maximum standard deviation at severity=1.0
+            seed: Random seed for reproducibility
+        """
+        self.std_max = std_max
+        self.seed = seed
+        self.generator = None
+        if seed is not None:
+            self.generator = torch.Generator()
+            self.generator.manual_seed(seed)
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Add Gaussian noise.
+
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1]
+
+        Returns:
+            Noisy images
+        """
+        if severity <= 0:
+            return images
+
+        std = severity * self.std_max
+
+        # Generate noise
+        if self.generator is not None:
+            noise = torch.randn(
+                images.shape,
+                dtype=images.dtype,
+                device=images.device,
+                generator=self.generator
+            ) * std
+        else:
+            noise = torch.randn_like(images) * std
+
+        # Add noise and clamp
+        noisy = images + noise
+        noisy = torch.clamp(noisy, 0, 1)
+
+        return noisy
+
+
+class Brightness:
+    """Brightness adjustment perturbation."""
+
+    def __init__(self, delta_max: float = 0.3):
+        """
+        Initialize brightness adjustment.
+
+        Args:
+            delta_max: Maximum brightness change at severity=1.0
+        """
+        self.delta_max = delta_max
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Adjust brightness.
+
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1] (negative for darkening)
+
+        Returns:
+            Brightness-adjusted images
+        """
+        if abs(severity) < 1e-10:
+            return images
+
+        delta = severity * self.delta_max
+
+        # Apply brightness adjustment
+        adjusted = images + delta
+        adjusted = torch.clamp(adjusted, 0, 1)
+
+        return adjusted
+
+
+class Contrast:
+    """Contrast adjustment perturbation."""
+
+    def __init__(self, factor_range: tuple = (0.5, 1.5)):
+        """
+        Initialize contrast adjustment.
+
+        Args:
+            factor_range: (min_factor, max_factor) for contrast
+        """
+        self.factor_min, self.factor_max = factor_range
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Adjust contrast.
+
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1]
+
+        Returns:
+            Contrast-adjusted images
+        """
+        if severity <= 0:
+            return images
+
+        # Map severity to contrast factor
+        # severity=0 -> factor=1 (no change)
+        # severity=1 -> factor=factor_min or factor_max
+        if severity <= 0.5:
+            # Decrease contrast
+            factor = 1.0 - 2 * severity * (1.0 - self.factor_min)
+        else:
+            # Increase contrast
+            factor = 1.0 + 2 * (severity - 0.5) * (self.factor_max - 1.0)
+
+        # Apply contrast adjustment
+        mean = images.mean(dim=(2, 3), keepdim=True)
+        adjusted = (images - mean) * factor + mean
+        adjusted = torch.clamp(adjusted, 0, 1)
+
+        return adjusted
+
+
+class LowLight:
+    """Low-light condition simulation using gamma correction."""
+
+    def __init__(self, gamma_max: float = 5.0):
+        """
+        Initialize low-light simulation.
+
+        Args:
+            gamma_max: Maximum gamma value at severity=1.0 (higher = darker)
+        """
+        self.gamma_max = gamma_max
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Apply low-light condition.
+
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1]
+
+        Returns:
+            Darkened images
+        """
+        if severity <= 0:
+            return images
+
+        # Map severity to gamma
+        # severity=0 -> gamma=1 (no change)
+        # severity=1 -> gamma=gamma_max (darkest)
+        gamma = 1.0 + severity * (self.gamma_max - 1.0)
+
+        # Apply gamma correction
+        adjusted = torch.pow(images, gamma)
+        adjusted = torch.clamp(adjusted, 0, 1)
+
+        return adjusted
+
+
+class MotionBlur:
+    """Motion blur perturbation."""
+
+    def __init__(self, kernel_size_max: int = 15):
+        """
+        Initialize motion blur.
+
+        Args:
+            kernel_size_max: Maximum kernel size at severity=1.0
+        """
+        self.kernel_size_max = kernel_size_max
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Apply motion blur.
+
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1]
+
+        Returns:
+            Motion-blurred images
+        """
+        if severity <= 0:
+            return images
+
+        # Calculate kernel size
+        kernel_size = int(3 + severity * (self.kernel_size_max - 3))
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+
+        # Create motion blur kernel (horizontal)
+        kernel = torch.zeros(kernel_size, kernel_size, dtype=images.dtype, device=images.device)
+        kernel[kernel_size // 2, :] = 1.0
+        kernel = kernel / kernel.sum()
+        kernel = kernel.unsqueeze(0).unsqueeze(0)
+
+        # Apply per channel
+        channels = images.shape[1]
+        kernel = kernel.repeat(channels, 1, 1, 1)
+
+        # Apply convolution
+        padding = kernel_size // 2
+        blurred = F.conv2d(
+            images,
+            kernel,
+            padding=padding,
+            groups=channels
+        )
+
+        return blurred
+
+
+class SaltPepperNoise:
+    """Salt and pepper noise perturbation."""
+
+    def __init__(self, prob_max: float = 0.05, seed: Optional[int] = None):
+        """
+        Initialize salt and pepper noise.
+
+        Args:
+            prob_max: Maximum probability at severity=1.0
+            seed: Random seed
+        """
+        self.prob_max = prob_max
+        self.seed = seed
+        self.generator = None
+        if seed is not None:
+            self.generator = torch.Generator()
+            self.generator.manual_seed(seed)
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Add salt and pepper noise.
+
+        Args:
+            images: Input images (B, C, H, W)
+            severity: Severity level in [0, 1]
+
+        Returns:
+            Noisy images
+        """
+        if severity <= 0:
+            return images
+
+        prob = severity * self.prob_max
+
+        # Generate random mask
+        if self.generator is not None:
+            mask = torch.rand(
+                images.shape,
+                dtype=images.dtype,
+                device=images.device,
+                generator=self.generator
+            )
+        else:
+            mask = torch.rand_like(images)
+
+        # Apply salt and pepper
+        noisy = images.clone()
+        noisy[mask < prob / 2] = 0  # Pepper
+        noisy[mask > 1 - prob / 2] = 1  # Salt
+
+        return noisy
+
+
+class Compose:
+    """Compose multiple perturbations sequentially."""
+
+    def __init__(self, perturbations: list):
+        """
+        Initialize composition.
+
+        Args:
+            perturbations: List of perturbation functions
+        """
+        self.perturbations = perturbations
+
+    def __call__(self, images: torch.Tensor, severity: float) -> torch.Tensor:
+        """
+        Apply all perturbations in sequence.
+
+        Args:
+            images: Input images
+            severity: Severity level applied to all perturbations
+
+        Returns:
+            Perturbed images
+        """
+        result = images
+        for perturbation in self.perturbations:
+            result = perturbation(result, severity)
+        return result
+
+
+def get_standard_perturbations() -> Dict[str, Callable]:
     """
-    Get available perturbations with descriptions.
+    Get standard set of environmental perturbations.
 
     Returns:
-        Dict mapping perturbation ID to description
+        Dictionary of perturbation name to function
     """
     return {
-        pert_id: f"{spec.name} - {spec.description}"
-        for pert_id, spec in PERTURBATIONS.items()
+        "blur": GaussianBlur(sigma_max=3.0),
+        "motion_blur": MotionBlur(kernel_size_max=15),
+        "noise": GaussianNoise(std_max=0.1),
+        "salt_pepper": SaltPepperNoise(prob_max=0.05),
+        "brightness": Brightness(delta_max=0.3),
+        "contrast": Contrast(factor_range=(0.5, 1.5)),
+        "lowlight": LowLight(gamma_max=5.0),
     }
 
 
-def get_perturbation(
-    perturbation: str,
-    preset: Optional[str] = None,
-) -> Tuple[Callable[[float], Strategy], float, float, str]:
+def get_minimal_perturbations() -> Dict[str, Callable]:
     """
-    Get a perturbation with appropriate ranges.
-
-    Args:
-        perturbation: Perturbation ID (e.g., "gaussian_noise")
-        preset: Dataset preset for range selection ("imagenet", "cifar10", etc.)
+    Get minimal set of key perturbations.
 
     Returns:
-        Tuple of (strategy_factory, level_lo, level_hi, name)
-
-    Raises:
-        ValueError: If perturbation ID is not recognized
-
-    Example:
-        >>> factory, lo, hi, name = get_perturbation("gaussian_noise", preset="imagenet")
-        >>> report = search(model, data, strategy=factory, level_lo=lo, level_hi=hi)
+        Dictionary of perturbation name to function
     """
-    if perturbation not in PERTURBATIONS:
-        available = ", ".join(PERTURBATIONS.keys())
-        raise ValueError(
-            f"Unknown perturbation: '{perturbation}'. "
-            f"Available: {available}"
-        )
-
-    spec = PERTURBATIONS[perturbation]
-    level_lo, level_hi = spec.get_range(preset)
-    factory = spec.create_factory()
-
-    return factory, level_lo, level_hi, spec.name
-
-
-# =============================================================================
-# Named Constants for IDE Autocomplete
-# =============================================================================
-
-class Perturbation:
-    """
-    Named constants for perturbation types.
-
-    Use these for IDE autocomplete and type safety instead of string literals.
-
-    Example:
-        >>> from visprobe.perturbations import Perturbation as P
-        >>> perturbations = [P.GAUSSIAN_NOISE, P.GAUSSIAN_BLUR, P.ROTATION]
-        >>> report = search(model, data, perturbation=P.GAUSSIAN_NOISE)
-    """
-    # Noise
-    GAUSSIAN_NOISE = "gaussian_noise"
-
-    # Blur
-    GAUSSIAN_BLUR = "gaussian_blur"
-    MOTION_BLUR = "motion_blur"
-
-    # Brightness
-    BRIGHTNESS_INCREASE = "brightness_increase"
-    BRIGHTNESS_DECREASE = "brightness_decrease"
-
-    # Contrast
-    CONTRAST_INCREASE = "contrast_increase"
-    CONTRAST_DECREASE = "contrast_decrease"
-
-    # Gamma
-    GAMMA_BRIGHT = "gamma_bright"
-    GAMMA_DARK = "gamma_dark"
-
-    # Geometric
-    ROTATION = "rotation"
-
-    # Compression
-    JPEG_COMPRESSION = "jpeg_compression"
-
-    @classmethod
-    def all(cls) -> list[str]:
-        """Get all available perturbation names."""
-        return [
-            cls.GAUSSIAN_NOISE,
-            cls.GAUSSIAN_BLUR,
-            cls.MOTION_BLUR,
-            cls.BRIGHTNESS_INCREASE,
-            cls.BRIGHTNESS_DECREASE,
-            cls.CONTRAST_INCREASE,
-            cls.CONTRAST_DECREASE,
-            cls.GAMMA_BRIGHT,
-            cls.GAMMA_DARK,
-            cls.ROTATION,
-            cls.JPEG_COMPRESSION,
-        ]
+    return {
+        "blur": GaussianBlur(sigma_max=3.0),
+        "noise": GaussianNoise(std_max=0.1),
+        "lowlight": LowLight(gamma_max=5.0),
+    }

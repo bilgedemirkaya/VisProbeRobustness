@@ -4,65 +4,74 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "visprobe"
-version = "0.2.0"
-description = "Find robustness failures in your vision models in 5 minutes"
+version = "2.0.0"
+description = "Simple, production-ready compositional robustness testing for vision models"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Bilge Demirkaya"}
+    {name = "Bilge Demirkaya", email = "your.email@example.com"}
 ]
-keywords = ["adversarial-robustness", "computer-vision", "deep-learning", "neural-networks", "pytorch", "testing", "fuzzing", "security"]
+maintainers = [
+    {name = "Bilge Demirkaya", email = "your.email@example.com"}
+]
+keywords = [
+    "adversarial-robustness",
+    "computer-vision",
+    "deep-learning",
+    "robustness-testing",
+    "pytorch",
+    "autoattack",
+    "compositional-testing"
+]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Testing",
     "Topic :: Security",
+    "Framework :: Pytest"
 ]
 dependencies = [
-    "torch>=2.0.0",
-    "torchvision>=0.15.0",
+    "torch>=1.10.0",
+    "torchvision>=0.11.0",
     "numpy>=1.19.0,<2.0.0",
-    "pillow>=8.0.0",
+    "matplotlib>=3.3.0",
     "tqdm>=4.60.0",
-    "pyyaml>=6.0.0",
-    "streamlit>=1.28.0",
-    "plotly>=5.17.0",
-    "pandas>=2.0.0",
-    "scipy>=1.9.0",
-    "matplotlib>=3.5.0",
-    "seaborn>=0.11.0",
 ]
 
 [project.optional-dependencies]
-viz = [
-    "altair>=4.2.0",
+autoattack = [
+    "autoattack>=0.2.0",
 ]
-adversarial = [
-    "adversarial-robustness-toolbox>=1.18.0",
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.990",
+    "build>=0.9.0",
+    "twine>=4.0.0",
 ]
-bayesian = [
-    "scipy>=1.9.0",
-    "scikit-learn>=1.0.0",
+all = [
+    "autoattack>=0.2.0",
 ]
-validation = [
-    "jsonschema>=4.0.0",
-]
-
-[project.scripts]
-visprobe = "visprobe.cli.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/bilgedemirkaya/VisProbe"
-Repository = "https://github.com/bilgedemirkaya/VisProbe"
-Issues = "https://github.com/bilgedemirkaya/VisProbe/issues"
+Homepage = "https://github.com/bilgedemirkaya/VisProbeRobustness"
+Documentation = "https://github.com/bilgedemirkaya/VisProbeRobustness#readme"
+Repository = "https://github.com/bilgedemirkaya/VisProbeRobustness.git"
+Issues = "https://github.com/bilgedemirkaya/VisProbeRobustness/issues"
+Changelog = "https://github.com/bilgedemirkaya/VisProbeRobustness/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -75,7 +84,7 @@ exclude = ["tests*"]
 # Black configuration
 [tool.black]
 line-length = 100
-target-version = ['py39', 'py310', 'py311']
+target-version = ['py38', 'py39', 'py310', 'py311']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -101,4 +110,3 @@ force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
 skip_gitignore = true
-

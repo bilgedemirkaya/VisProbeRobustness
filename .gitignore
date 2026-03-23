@@ -16,15 +16,20 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual environments
 venv/
 ENV/
 env/
 .venv
+.env
+.env.local
 
 # IDEs
 .vscode/
@@ -33,24 +38,31 @@ env/
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
 # Testing
 .tox/
+.nox/
 .coverage
 .coverage.*
 htmlcov/
 .pytest_cache/
 coverage.xml
 *.cover
+*.py,cover
 .hypothesis/
+nosetests.xml
+junit.xml
 
 # Documentation
 docs/_build/
 docs/build/
+site/
 
 # Package files
 *.tar.gz
 *.zip
+*.whl
 
 # Data files
 data/
@@ -60,22 +72,49 @@ data/
 *.npz
 *.pth
 *.pt
+*.safetensors
 
 # Logs
 *.log
-
-# Environment variables
-.env
-.env.local
+logs/
 
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
 !examples/*.ipynb
 
-# Results
+# Results and checkpoints
 results/
 outputs/
 reports/
+checkpoints/
+*_checkpoints/
 *.json
 !config/*.json
+*.png
+*.jpg
+*.jpeg
+
+# PyPI
+.pypirc
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Local development
+test_*.py
+!test_refactored.py
+temp/
+tmp/
+scratch/
