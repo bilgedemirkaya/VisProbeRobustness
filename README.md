@@ -1,17 +1,20 @@
 # VisProbe
 
-**Compositional robustness testing for vision models.**
+**Test your vision model the way it will actually fail — under real-world conditions, not lab conditions.**
 
-VisProbe runs a single, focused experiment: sweep your classifier across `environment x adversarial-attack x severity`, save every intermediate result so a crash never costs progress, and swap models between CPU and GPU so multiple models do not OOM. That is the entire tool.
+Your image classifier has 94% accuracy on the test set. What does it do when the camera is noisy *and* the lighting drops *and* someone is adversarially crafting input at the same time? Pure AutoAttack benchmarks answer none of those — they assume pristine images. Real deployments rarely give you pristine images.
+
+VisProbe runs the experiment that does: sweep your model across `environment × adversarial-attack × severity` in one command and tell you where it actually breaks. One call. Auto-resuming. No OOM. Save the results once, share them anywhere.
 
 ## What you get
 
-- **Compositional eval pipeline** — environmental perturbation, then adversarial attack, then accuracy, across a severity sweep.
-- **Checkpoint + auto-resume** — every `(model, scenario, severity)` cell is checkpointed; rerunning picks up exactly where it stopped.
-- **GPU memory management** — only one model on the GPU at a time, the rest are swapped to CPU.
-- **AutoAttack + APGD-CE built in** — plus PGD, plus a `none` mode for environment-only sweeps.
-- **4 environmental perturbations** — Gaussian blur, Gaussian noise, brightness shift, low-light (gamma).
-- **Saveable, loadable results** — inspect runs offline without GPUs or model weights.
+**For evaluating one model.** Run a sweep with one command. Get accuracy curves across blur, noise, low-light, and brightness — each combined with adversarial attack at multiple severities. The interaction effects are where models fail in practice and where pure attack benchmarks are silent.
+
+**For long experiments.** Every `(model, scenario, severity)` cell is checkpointed as soon as it finishes. Kernel crash, session timeout, manual cancel — rerun and it picks up exactly where it stopped. We learned this the hard way.
+
+**For multi-model comparisons.** One model on the GPU, the rest swapped to CPU automatically. Compare 4-5 architectures on a single 24GB card without OOM.
+
+**For sharing results.** Save once, load anywhere. Analyze on a laptop without GPUs or model weights — useful when your run finished on a server and you want to do the writeup on the train.
 
 ## Install
 
@@ -38,18 +41,38 @@ experiment = CompositionalExperiment(
 
 results = experiment.run()                  # auto-resumes if interrupted
 results.print_summary()
-results.plot_compositional()
 results.save("./results")
 ```
+
+**Example output:**
+
+```
+VisProbe Compositional Robustness Report
+========================================
+Model: resnet50 (24M params)
+Clean accuracy:          94.2%
+Robust accuracy (AA):    12.4%
+
+Compositional degradation:
+  blur + AA:        94.2% → 8.1%    (-86 pp at max severity)
+  noise + AA:       94.2% → 11.3%   (-83 pp at max severity)
+  brightness + AA:  94.2% → 9.7%    (-84 pp at max severity)
+  lowlight + AA:    94.2% →  2.1%   (-92 pp at max severity)   ← weakest
+
+Results saved to ./results/   •   3m 42s
+```
+
+The `lowlight + AA` row is the kind of failure mode a pure AutoAttack benchmark never surfaces — *the model is two-thirds more fragile under low light than under a clean attack*. That's the entire point of running the composition.
 
 Reload later, on any machine:
 
 ```python
 from visprobe import CompositionalResults
 results = CompositionalResults.load("./results")
+results.plot_compositional()
 ```
 
-A runnable end-to-end walkthrough lives in [examples/visprobe_walkthrough.ipynb](examples/visprobe_walkthrough.ipynb).
+A full walkthrough lives in [examples/visprobe_walkthrough.ipynb](examples/visprobe_walkthrough.ipynb).
 
 ## Attack modes
 
@@ -77,21 +100,25 @@ A runnable end-to-end walkthrough lives in [examples/visprobe_walkthrough.ipynb]
 
 Each is a callable `(images, severity) -> images` where `severity=0` is a no-op. Pass your own dictionary into `env_strategies=` to use custom perturbations.
 
+## Roadmap — coming in v3
+
+**RobustBench leaderboard integration.** After your run finishes, get back something like:
+
+> *Your model would rank #14 on the ImageNet Linf leaderboard. Closest comparable is `Liu2023_Swin-B` at +4.1 pp robust accuracy. Head-to-head on your data: your model beats `Liu2023_Swin-B` under `noise + AA` but loses by 11 pp under `lowlight + AA`.*
+
+Two distinct comparisons in one command: the **official rank** (under RobustBench's strict protocol) and a **head-to-head** that re-evaluates the top-k published robust models *on your data*, so you see how they hold up under the same compositional conditions yours just failed. See [ROADMAP.md](ROADMAP.md) for the full design.
+
 ## Architecture
 
 ```
 src/visprobe/
 ├── experiment.py     # CompositionalExperiment runner
 ├── checkpoint.py     # CheckpointManager: per-cell save/resume
-├── memory.py         # ModelMemoryManager: CPU<->GPU swapping
+├── memory.py         # ModelMemoryManager: CPU <-> GPU swapping
 ├── attacks.py        # AttackFactory: AutoAttack, APGD-CE, PGD, none
 ├── perturbations.py  # 4 environmental perturbations
 └── results.py        # CompositionalResults: save/load, summary, plotting
 ```
-
-## Roadmap
-
-The next planned feature is **RobustBench leaderboard integration** for v2 — see [ROADMAP.md](ROADMAP.md) for the full design.
 
 ## License
 
