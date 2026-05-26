@@ -1,8 +1,9 @@
 include README.md
 include LICENSE
-include requirements.txt
+include CHANGELOG.md
+include ROADMAP.md
 recursive-include src/visprobe *.py
-recursive-include src/visprobe/config *.yaml *.json
+recursive-include examples *.ipynb
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 global-exclude *.pyc
