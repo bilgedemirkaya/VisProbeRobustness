@@ -6,7 +6,7 @@ Handles checkpointing, memory management, and orchestration.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, List, Optional, Callable, Union
+from typing import Dict, List, Optional, Callable
 from pathlib import Path
 import logging
 from tqdm import tqdm
@@ -99,23 +99,13 @@ class CompositionalExperiment:
                 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
             )
 
-    def run(self, gpus: Optional[List[int]] = None) -> CompositionalResults:
+    def run(self) -> CompositionalResults:
         """
-        Run the experiment.
-
-        Args:
-            gpus: List of GPU IDs for parallel execution (None for single GPU/CPU)
+        Run the experiment, resuming from checkpoint if one exists.
 
         Returns:
-            CompositionalResults with all evaluation data
+            CompositionalResults with all evaluation data.
         """
-        if gpus and len(gpus) > 1:
-            return self._run_multi_gpu(gpus)
-        else:
-            return self._run_single_gpu()
-
-    def _run_single_gpu(self) -> CompositionalResults:
-        """Run experiment on single GPU with model swapping."""
         results = CompositionalResults()
 
         # Check for existing results
@@ -308,64 +298,8 @@ class CompositionalExperiment:
         )
         return actual_count >= expected_count
 
-    def _run_multi_gpu(self, gpus: List[int]) -> CompositionalResults:
-        """
-        Run experiment in parallel across multiple GPUs.
-
-        This is a placeholder for future implementation.
-        """
-        logger.warning("Multi-GPU support not yet implemented. Falling back to single GPU.")
-        return self._run_single_gpu()
-
     def cleanup(self):
-        """Clean up resources."""
+        """Release any models held on GPU and clear the CUDA cache."""
         self.memory_mgr.release_all()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
-
-def quick_test(
-    model: nn.Module,
-    images: torch.Tensor,
-    labels: torch.Tensor,
-    attack: str = "pgd",
-    severity: float = 0.5
-) -> Dict[str, float]:
-    """
-    Quick test function for single evaluation.
-
-    Args:
-        model: Model to test
-        images: Input images
-        labels: Ground truth labels
-        attack: Attack type
-        severity: Perturbation severity
-
-    Returns:
-        Dictionary with accuracy metrics
-    """
-    from .perturbations import get_minimal_perturbations
-
-    # Create simple experiment
-    experiment = CompositionalExperiment(
-        models={'model': model},
-        images=images,
-        labels=labels,
-        env_strategies=get_minimal_perturbations(),
-        attack=attack,
-        severities=[severity],
-        verbose=False
-    )
-
-    # Run
-    results = experiment.run()
-
-    # Extract metrics
-    metrics = {}
-    for scenario in results.get_scenarios():
-        result = results.get_result('model', scenario, severity)
-        if result:
-            metrics[f'{scenario}_accuracy'] = result.accuracy
-
-    experiment.cleanup()
-    return metrics
