@@ -368,51 +368,94 @@ class RobustBenchClient:
 # LeaderboardComparison: the user-facing result of `compare_to_leaderboard()`
 # ---------------------------------------------------------------------------
 
+def _format_eps_for_display(eps: float) -> str:
+    """Linf eps values are conventionally written as fractions over 255
+    (e.g. ``8/255``, ``4/255``). Render the fraction form when ``eps * 255``
+    is a clean integer; fall back to a 6-decimal float otherwise.
+    """
+    numerator = eps * 255
+    if abs(numerator - round(numerator)) < 1e-9:
+        return f"{int(round(numerator))}/255"
+    return f"{eps:.6f}"
+
+
 @dataclass(frozen=True)
 class LeaderboardComparison:
     """Result of Feature A — a rank against the published RobustBench leaderboard.
 
     Returned by ``CompositionalResults.compare_to_leaderboard()`` (M7). The
     central UX is ``str(comparison)``: a multi-line table that prints the
-    rank, the model's robust accuracy, the snapshot freshness banner, and up
-    to three neighbors on each side. Designed to be pasted into a paper draft
-    or PR description without further formatting.
+    rank, the model's robust accuracy, the protocol used, the snapshot
+    freshness banner, and up to three neighbors on each side. Designed to be
+    pasted into a paper draft or PR description without further formatting.
 
     Fields:
         model_name      — your model's name (the key in CompositionalExperiment.models)
         robust_acc      — your model's robust accuracy under the strict protocol
         rank            — 1-indexed competition rank in the leaderboard
         total           — number of entries on the leaderboard
-        neighbors_above — entries strictly better than yours (DESC robust_acc)
-        neighbors_below — entries strictly worse (DESC robust_acc, closest first)
+        neighbors_above — entries CLOSEST above yours (frozen tuple of dicts)
+        neighbors_below — entries CLOSEST below yours (frozen tuple of dicts)
         snapshot_date   — ISO date the snapshot was frozen — printed in every
                           render so staleness is never hidden
         dataset, threat — which leaderboard this is from
+        attack          — protocol attack name (e.g. "autoattack-standard")
+        eps             — protocol eps value (rendered as N/255 when applicable)
+
+    Frozen contract: stored neighbor sequences are tuples (immutable). The
+    contained dicts are still mutable, but RobustBenchClient hands out fresh
+    dicts on every call so the leaderboard state cannot be corrupted via this
+    object.
     """
 
     model_name: str
     robust_acc: float
     rank: int
     total: int
-    neighbors_above: list
-    neighbors_below: list
+    neighbors_above: tuple
+    neighbors_below: tuple
     snapshot_date: str
     dataset: str
     threat: str
+    attack: str
+    eps: float
+
+    def __post_init__(self):
+        # Accept any iterable at construction (lists from RobustBenchClient.neighbors()),
+        # store as tuples so the frozen contract is honored.
+        if not isinstance(self.neighbors_above, tuple):
+            object.__setattr__(self, "neighbors_above", tuple(self.neighbors_above))
+        if not isinstance(self.neighbors_below, tuple):
+            object.__setattr__(self, "neighbors_below", tuple(self.neighbors_below))
 
     @property
     def percentile(self) -> float:
-        """Percentile rank: 100% at rank 1, drops linearly to ~0% at rank=total."""
+        """Where you sit on the leaderboard as a "top X%" figure.
+
+        Examples:
+            rank 1   of 100 → 1.0   ("top 1.0%")
+            rank 50  of 100 → 50.0  ("top 50.0%")
+            rank 100 of 100 → 100.0 ("top 100.0%" — last)
+
+        Note: this is the COLLOQUIAL reading of "top X%", not the statistical
+        percentile-rank (% of entries you outperform). The two disagree by an
+        inversion; the colloquial reading is what readers expect when they paste
+        an output like "top 5%" into a paper.
+        """
         if self.total <= 0:
             return 0.0
-        return (1.0 - (self.rank - 1) / self.total) * 100.0
+        return (self.rank / self.total) * 100.0
 
     def __str__(self) -> str:
         title = f"RobustBench {self.dataset}/{self.threat} — {self.model_name}"
         lines = [title, "=" * len(title)]
         lines.append(f"Rank:         {self.rank} of {self.total}   (top {self.percentile:.1f}%)")
         lines.append(f"Robust acc:   {self.robust_acc:.4f}")
-        lines.append(f"Snapshot:     {self.snapshot_date} ({self.total} entries)")
+        lines.append(
+            f"Protocol:     {self.attack}, eps={_format_eps_for_display(self.eps)} "
+            f"(full RobustBench {self.threat})"
+        )
+        lines.append(f"Snapshot:     {self.snapshot_date}")
 
         if self.neighbors_above:
             lines.append("")
