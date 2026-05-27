@@ -82,6 +82,25 @@ _PROTOCOL = {
 }
 
 
+def get_protocol_spec(dataset: str, threat: str) -> dict:
+    """Return the RobustBench protocol spec for ``(dataset, threat)``.
+
+    Used by ``robustbench_eval`` (M6) to pin its evaluation parameters and by
+    any future code that needs to inspect the protocol programmatically.
+    Returns a fresh dict so the caller cannot accidentally mutate the table.
+
+    Raises:
+        ValueError: if no protocol is defined for the pair.
+    """
+    dataset, threat = _canonicalize(dataset, threat)
+    if (dataset, threat) not in _PROTOCOL:
+        raise ValueError(
+            f"No RobustBench protocol defined for dataset={dataset!r}, threat={threat!r}. "
+            f"Known: {sorted(_PROTOCOL)}"
+        )
+    return dict(_PROTOCOL[(dataset, threat)])
+
+
 class ProtocolError(Exception):
     """Raised when an ``EvaluationResult`` does not satisfy the RobustBench protocol.
 

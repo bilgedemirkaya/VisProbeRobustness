@@ -26,7 +26,7 @@ Quick start:
 
 __version__ = "2.0.0"
 
-from .experiment import CompositionalExperiment
+from .experiment import CompositionalExperiment, robustbench_eval
 from .results import CompositionalResults, EvaluationResult
 from .perturbations import (
     get_standard_perturbations,
@@ -35,9 +35,16 @@ from .perturbations import (
     Brightness,
     LowLight,
 )
-from . import attacks
+from . import attacks, leaderboard
+from .leaderboard import (
+    ProtocolError,
+    RobustBenchClient,
+    LeaderboardComparison,
+    validate_protocol,
+)
 
 __all__ = [
+    # v2 core
     "CompositionalExperiment",
     "CompositionalResults",
     "EvaluationResult",
@@ -47,4 +54,11 @@ __all__ = [
     "Brightness",
     "LowLight",
     "attacks",
+    # v3: RobustBench integration
+    "robustbench_eval",
+    "leaderboard",
+    "RobustBenchClient",
+    "LeaderboardComparison",
+    "ProtocolError",
+    "validate_protocol",
 ]

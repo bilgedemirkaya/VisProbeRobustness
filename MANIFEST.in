@@ -3,6 +3,7 @@ include LICENSE
 include CHANGELOG.md
 include ROADMAP.md
 recursive-include src/visprobe *.py
+recursive-include src/visprobe/data *.json *.md
 recursive-include examples *.ipynb
 prune scripts
 recursive-exclude * __pycache__

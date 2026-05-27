@@ -136,6 +136,80 @@ class CompositionalResults:
 
         return auc
 
+    # =========================================================================
+    # RobustBench comparison (v3 / Feature A)
+    # =========================================================================
+
+    def compare_to_leaderboard(
+        self,
+        model_name: str,
+        dataset: str,
+        threat: str,
+    ):
+        """Rank a protocol-compliant result against the RobustBench leaderboard.
+
+        Finds the cell at ``(model_name, scenario='none', severity=0.0)``,
+        validates it satisfies RobustBench's protocol (M3 gate), and looks up
+        its rank in the shipped leaderboard snapshot.
+
+        Args:
+            model_name: the key under which the result was added (typically
+                the name passed to ``CompositionalExperiment(models={...})``
+                or ``"_robustbench_target"`` if produced by ``robustbench_eval``).
+            dataset: "cifar10" or "imagenet" (case-insensitive).
+            threat: "Linf" (case-insensitive).
+
+        Returns:
+            ``LeaderboardComparison`` — print it with ``str(...)`` to get a
+            paper-pasteable summary.
+
+        Raises:
+            ValueError: no cell at ``(model_name, 'none', 0.0)``. The error
+                message tells the user to call ``robustbench_eval`` first.
+            ProtocolError: the cell exists but does not match RobustBench's
+                strict protocol. Always indicates user produced the cell via
+                ``CompositionalExperiment`` directly, not via ``robustbench_eval``.
+        """
+        # Defer import to avoid a top-of-file import cycle: results.py is
+        # imported by experiment.py, which leaderboard.py uses via TYPE_CHECKING.
+        from .leaderboard import (
+            RobustBenchClient,
+            LeaderboardComparison,
+            validate_protocol,
+        )
+
+        cell = self.get_result(model_name, "none", 0.0)
+        if cell is None:
+            raise ValueError(
+                f"No cell found at (model={model_name!r}, scenario='none', severity=0.0). "
+                "Produce one with:\n"
+                f"    from visprobe import robustbench_eval\n"
+                f"    result = robustbench_eval(model, "
+                f"dataset={dataset!r}, threat={threat!r}, confirm=True)"
+            )
+
+        # Gate. Raises ProtocolError if the cell isn't a strict-protocol result.
+        # Canonicalization inside validate_protocol means callers can pass
+        # any case for dataset/threat — the gate normalizes both before lookup.
+        validate_protocol(cell, dataset, threat)
+
+        client = RobustBenchClient(dataset, threat)
+        above, below = client.neighbors(cell.accuracy, k=3)
+
+        return LeaderboardComparison(
+            model_name=model_name,
+            robust_acc=cell.accuracy,
+            rank=client.rank(cell.accuracy),
+            total=len(client),
+            neighbors_above=above,
+            neighbors_below=below,
+            snapshot_date=client.snapshot_date,
+            dataset=client.dataset,
+            threat=client.threat,
+            attack=(cell.metadata or {}).get("attack", ""),
+            eps=cell.eps,
+        )
+
 
     # =========================================================================
     # Serialization
