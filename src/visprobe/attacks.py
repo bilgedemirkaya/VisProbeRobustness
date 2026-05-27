@@ -137,20 +137,12 @@ class AutoAttackStandard:
 
         aa = self._aa_cache[model_id]
 
-        # Update epsilon if changed
-        if aa.eps != self.eps:
-            aa.eps = self.eps
-            # Update for all sub-attacks
-            if hasattr(aa, 'apgd'):
-                aa.apgd.eps = self.eps
-            if hasattr(aa, 'apgd_targeted'):
-                aa.apgd_targeted.eps = self.eps
-            if hasattr(aa, 'fab'):
-                aa.fab.eps = self.eps
-            if hasattr(aa, 'square'):
-                aa.square.eps = self.eps
+        # Recent AutoAttack versions don't expose `.eps` on the wrapper; sync to sub-attacks instead.
+        for sub_name in ("apgd", "apgd_targeted", "fab", "square"):
+            sub = getattr(aa, sub_name, None)
+            if sub is not None:
+                sub.eps = self.eps
 
-        # Run attack
         with torch.no_grad():
             x_adv = aa.run_standard(images, labels, bs=self.batch_size)
 
@@ -219,13 +211,10 @@ class AutoAttackAPGD:
 
         aa = self._aa_cache[model_id]
 
-        # Update epsilon if changed
-        if aa.eps != self.eps:
-            aa.eps = self.eps
-            if hasattr(aa, 'apgd'):
-                aa.apgd.eps = self.eps
+        sub = getattr(aa, "apgd", None)
+        if sub is not None:
+            sub.eps = self.eps
 
-        # Run attack
         with torch.no_grad():
             x_adv = aa.run_standard(images, labels, bs=self.batch_size)
 
@@ -273,8 +262,9 @@ class AutoAttackAPGDDLR:
             )
 
         aa = self._aa_cache[model_id]
-        if aa.eps != self.eps:
-            aa.eps = self.eps
+        sub = getattr(aa, "apgd", None)
+        if sub is not None:
+            sub.eps = self.eps
 
         with torch.no_grad():
             x_adv = aa.run_standard(images, labels, bs=self.batch_size)

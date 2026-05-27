@@ -1,20 +1,25 @@
 # VisProbe
 
-**Test your vision model the way it will actually fail — under real-world conditions, not lab conditions.**
+**Test your vision model the way it should be tested, under real-world conditions.**
 
-Your image classifier has 94% accuracy on the test set. What does it do when the camera is noisy *and* the lighting drops *and* someone is adversarially crafting input at the same time? Pure AutoAttack benchmarks answer none of those — they assume pristine images. Real deployments rarely give you pristine images.
+Let's say your image classifier has a high accuracy on a test set. How would it actually perform when the camera is noisy, the lighting drops and someone adversarially crafts input at the same time? Pure AutoAttack benchmarks do not account for real-world scenarios like this, and regular tests assume pristine images which hide failures. Real deployments are complex and often underperform in such imperfect conditions.
 
-VisProbe runs the experiment that does: sweep your model across `environment × adversarial-attack × severity` in one command and tell you where it actually breaks. One call. Auto-resuming. No OOM. Save the results once, share them anywhere.
+VisProbe expands upon AutoAttack by performing additional tests on your model to evaluate real-world conditions. In a nutshell, VisProbe sweeps your model across `environment × adversarial-attack × severity` in one command and tells you where it actually breaks.
 
 ## What you get
 
-**For evaluating one model.** Run a sweep with one command. Get accuracy curves across blur, noise, low-light, and brightness — each combined with adversarial attack at multiple severities. The interaction effects are where models fail in practice and where pure attack benchmarks are silent.
+**When evaluating one model**
+- Run a sweep with one command and obtain accuracy curves across blur, noise, low-light, and brightness — each combined with adversarial attack at multiple severities.
+- The interaction effects are where models fail in practice and where pure attack benchmarks are silent.
 
-**For long experiments.** Every `(model, scenario, severity)` cell is checkpointed as soon as it finishes. Kernel crash, session timeout, manual cancel — rerun and it picks up exactly where it stopped. We learned this the hard way.
+**For long experiments**
+- Every `(model, scenario, severity)` cell is checkpointed as soon as it finishes. Kernel crash, session timeout, manual cancel — rerun and it picks up exactly where it stopped.
 
-**For multi-model comparisons.** One model on the GPU, the rest swapped to CPU automatically. Compare 4-5 architectures on a single 24GB card without OOM.
+**For multi-model comparisons**
+- One model on the GPU, the rest swapped to CPU automatically. Compare 4-5 architectures on a single 24GB card without OOM.
 
-**For sharing results.** Save once, load anywhere. Analyze on a laptop without GPUs or model weights — useful when your run finished on a server and you want to do the writeup on the train.
+**For sharing results**
+- Save once, load anywhere. Analyze on a laptop without GPUs or model weights — useful when your run finished on a server and you want to do the writeup on the train.
 
 ## Install
 
@@ -62,7 +67,7 @@ Compositional degradation:
 Results saved to ./results/   •   3m 42s
 ```
 
-The `lowlight + AA` row is the kind of failure mode a pure AutoAttack benchmark never surfaces — *the model is two-thirds more fragile under low light than under a clean attack*. That's the entire point of running the composition.
+The `lowlight + AA` row is the kind of failure mode a pure AutoAttack benchmark never surfaces — *the model is nearly six times more fragile under low light than under a clean attack*. That's the entire point of running the composition.
 
 Reload later, on any machine:
 
