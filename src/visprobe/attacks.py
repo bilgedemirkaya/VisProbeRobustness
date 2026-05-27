@@ -144,7 +144,7 @@ class AutoAttackStandard:
                 sub.eps = self.eps
 
         with torch.no_grad():
-            x_adv = aa.run_standard(images, labels, bs=self.batch_size)
+            x_adv = aa.run_standard_evaluation(images, labels, bs=self.batch_size)
 
         return x_adv
 
@@ -216,7 +216,7 @@ class AutoAttackAPGD:
             sub.eps = self.eps
 
         with torch.no_grad():
-            x_adv = aa.run_standard(images, labels, bs=self.batch_size)
+            x_adv = aa.run_standard_evaluation(images, labels, bs=self.batch_size)
 
         return x_adv
 
@@ -267,7 +267,7 @@ class AutoAttackAPGDDLR:
             sub.eps = self.eps
 
         with torch.no_grad():
-            x_adv = aa.run_standard(images, labels, bs=self.batch_size)
+            x_adv = aa.run_standard_evaluation(images, labels, bs=self.batch_size)
 
         return x_adv
 

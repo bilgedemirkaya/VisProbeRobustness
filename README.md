@@ -8,18 +8,18 @@ VisProbe expands upon AutoAttack by performing additional tests on your model to
 
 ## What you get
 
-**When evaluating one model**
+**When evaluating one model:**
 - Run a sweep with one command and obtain accuracy curves across blur, noise, low-light, and brightness — each combined with adversarial attack at multiple severities.
 - The interaction effects are where models fail in practice and where pure attack benchmarks are silent.
 
-**For long experiments**
+**For long experiments:**
 - Every `(model, scenario, severity)` cell is checkpointed as soon as it finishes. Kernel crash, session timeout, manual cancel — rerun and it picks up exactly where it stopped.
 
-**For multi-model comparisons**
+**For multi-model comparisons:**
 - One model on the GPU, the rest swapped to CPU automatically. Compare 4-5 architectures on a single 24GB card without OOM.
 
-**For sharing results**
-- Save once, load anywhere. Analyze on a laptop without GPUs or model weights — useful when your run finished on a server and you want to do the writeup on the train.
+**For separating compute from analysis:**
+- Save the experiment to disk once; reload it on any machine. The expensive part needs a GPU and model weights; the analysis (plots, summaries, comparisons) needs neither. Run on a server, analyze on a laptop, share with a collaborator.
 
 ## Install
 
