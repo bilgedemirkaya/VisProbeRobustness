@@ -11,17 +11,20 @@ strict protocol or no rank is returned. Misconfiguration becomes a loud error
 instead of a misleading number.
 
 Public surface:
-    ProtocolError       — raised when an eval does not satisfy the protocol
-    validate_protocol   — the gate function; call it before producing a rank
-    RobustBenchClient   — read-only client over a frozen snapshot;
-                          provides rank, top_k, neighbors
+    ProtocolError        — raised when an eval does not satisfy the protocol
+    validate_protocol    — the gate function; call it before producing a rank
+    RobustBenchClient    — read-only client over a frozen snapshot;
+                           provides rank, top_k, neighbors
+    LeaderboardComparison — result dataclass returned by Feature A; renders
+                           a paper-pasteable summary via ``str(...)``
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from importlib.resources import files
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .results import EvaluationResult
@@ -35,6 +38,33 @@ with newer field semantics. The ``RobustBenchClient`` constructor raises on
 anything higher than this so an old visprobe install cannot silently
 misread a future snapshot.
 """
+
+
+# Canonical case for threat models. Accept any case at public-API entry; the
+# filename ``robustbench_<dataset>_<threat>.json`` uses lowercase, but the
+# ``_PROTOCOL`` table and RobustBench's own conventions use the canonical
+# capitalization. Centralizing this avoids the bug where one path uses
+# ``threat.lower()`` and another uses exact-case lookup.
+_CANONICAL_THREAT = {"linf": "Linf", "l2": "L2"}
+
+
+def _canonicalize(dataset: str, threat: str) -> tuple[str, str]:
+    """Normalize (dataset, threat) inputs to the forms used internally.
+
+    Public APIs accept any case ("Linf", "linf", "LINF") and internal lookups
+    use a single canonical form, so two related APIs cannot disagree on the
+    same input.
+    """
+    if not isinstance(dataset, str):
+        raise ValueError(f"dataset must be a string, got {type(dataset).__name__}")
+    if not isinstance(threat, str):
+        raise ValueError(f"threat must be a string, got {type(threat).__name__}")
+    threat_canonical = _CANONICAL_THREAT.get(threat.lower())
+    if threat_canonical is None:
+        raise ValueError(
+            f"Unknown threat {threat!r}. Known: {sorted(set(_CANONICAL_THREAT.values()))}"
+        )
+    return dataset.lower(), threat_canonical
 
 
 # Float tolerance for any scalar protocol field (severity, eps).
@@ -87,6 +117,7 @@ def validate_protocol(result: "EvaluationResult", dataset: str, threat: str) -> 
         ProtocolError: if any protocol field does not match. Multi-line message
             lists every violation; do not split a single check across multiple calls.
     """
+    dataset, threat = _canonicalize(dataset, threat)
     key = (dataset, threat)
     if key not in _PROTOCOL:
         raise ValueError(
@@ -128,7 +159,9 @@ def validate_protocol(result: "EvaluationResult", dataset: str, threat: str) -> 
             f"Cannot rank against RobustBench {dataset}/{threat} — protocol mismatch:\n  - "
             + "\n  - ".join(violations)
             + f"\n\nFix: use robustbench_eval(model, dataset={dataset!r}, threat={threat!r}) "
-              "to produce a protocol-compliant result."
+              "to produce a protocol-compliant result, or check that result.metadata "
+              "survived any serialization round-trip (pickle, JSON dump/load) that might "
+              "have stripped it."
         )
 
 
@@ -198,6 +231,7 @@ class RobustBenchClient:
     """
 
     def __init__(self, dataset: str, threat: str):
+        dataset, threat = _canonicalize(dataset, threat)
         self.dataset = dataset
         self.threat = threat
         fname = f"robustbench_{dataset}_{threat.lower()}.json"
@@ -224,30 +258,47 @@ class RobustBenchClient:
         return obj
 
     def _init_from_data(self, data: dict, *, label: str) -> None:
+        # schema_version: reject bool (which is int subclass), 0, negatives,
+        # and anything newer than this code knows about.
         version = data.get("schema_version")
-        if not isinstance(version, int) or version > _MAX_KNOWN_SCHEMA:
+        if (
+            not isinstance(version, int)
+            or isinstance(version, bool)
+            or version < 1
+            or version > _MAX_KNOWN_SCHEMA
+        ):
             raise ValueError(
                 f"Snapshot {label} has schema_version={version!r}; "
-                f"this visprobe knows up to schema_version={_MAX_KNOWN_SCHEMA}. "
+                f"this visprobe knows schema_version 1..{_MAX_KNOWN_SCHEMA}. "
                 "Upgrade visprobe to read newer snapshots."
             )
 
-        entries = data.get("entries")
-        if not isinstance(entries, list) or not entries:
+        eps_raw = data.get("eps")
+        if not isinstance(eps_raw, (int, float)) or isinstance(eps_raw, bool):
+            raise ValueError(
+                f"Snapshot {label} eps must be numeric, got {type(eps_raw).__name__} "
+                f"({eps_raw!r})"
+            )
+
+        entries_raw = data.get("entries")
+        if not isinstance(entries_raw, list) or not entries_raw:
             raise ValueError(f"Snapshot {label} has no entries")
 
-        _validate_entries(entries, label)
+        _validate_entries(entries_raw, label)
 
-        # Defensive: sort desc by robust_acc and re-assign ranks in case the
-        # snapshot file was hand-edited and got the ranking out of sync with
-        # the robust_acc ordering.
-        entries = sorted(entries, key=lambda e: float(e["robust_acc"]), reverse=True)
+        # Defensive copy so we don't mutate the caller's dicts when re-ranking.
+        # (Important for from_dict: the caller-supplied dicts must be left alone.)
+        entries = [dict(e) for e in entries_raw]
+
+        # Defensive sort + re-rank in case a snapshot was hand-edited and the
+        # stored ranks fell out of sync with the robust_acc ordering.
+        entries.sort(key=lambda e: float(e["robust_acc"]), reverse=True)
         for i, e in enumerate(entries, start=1):
             e["rank"] = i
 
         self._entries = entries
         self._snapshot_date = str(data.get("snapshot_date", ""))
-        self._eps = data.get("eps")
+        self._eps = float(eps_raw)
 
     def __len__(self) -> int:
         return len(self._entries)
@@ -257,7 +308,7 @@ class RobustBenchClient:
         return self._snapshot_date
 
     @property
-    def eps(self) -> Optional[float]:
+    def eps(self) -> float:
         return self._eps
 
     def entries(self) -> list[dict]:
@@ -292,8 +343,12 @@ class RobustBenchClient:
         """Entries ranked just above and just below ``robust_acc``.
 
         Returns ``(above, below)``:
-          * ``above`` — up to k entries with strictly higher robust_acc, in
-            DESC order (matches natural leaderboard display: highest first).
+          * ``above`` — up to k entries CLOSEST above robust_acc (NOT the
+            top of the leaderboard), in DESC order so the highest-of-the-
+            closest appears first. Example with leaderboard
+            ``[0.71, 0.70, 0.68, 0.65, 0.59]`` and ``robust_acc=0.67, k=2``:
+            ``above == [{rank: 2, robust_acc: 0.70}, {rank: 3, robust_acc: 0.68}]``
+            — the two closest entries above 0.67, NOT ``[0.71, 0.70]``.
           * ``below`` — up to k entries with strictly lower robust_acc, in
             DESC order (closest below appears first).
 
@@ -307,3 +362,78 @@ class RobustBenchClient:
         above = [e for e in self._entries if e["robust_acc"] > robust_acc]
         below = [e for e in self._entries if e["robust_acc"] < robust_acc]
         return ([dict(e) for e in above[-k:]], [dict(e) for e in below[:k]])
+
+
+# ---------------------------------------------------------------------------
+# LeaderboardComparison: the user-facing result of `compare_to_leaderboard()`
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class LeaderboardComparison:
+    """Result of Feature A — a rank against the published RobustBench leaderboard.
+
+    Returned by ``CompositionalResults.compare_to_leaderboard()`` (M7). The
+    central UX is ``str(comparison)``: a multi-line table that prints the
+    rank, the model's robust accuracy, the snapshot freshness banner, and up
+    to three neighbors on each side. Designed to be pasted into a paper draft
+    or PR description without further formatting.
+
+    Fields:
+        model_name      — your model's name (the key in CompositionalExperiment.models)
+        robust_acc      — your model's robust accuracy under the strict protocol
+        rank            — 1-indexed competition rank in the leaderboard
+        total           — number of entries on the leaderboard
+        neighbors_above — entries strictly better than yours (DESC robust_acc)
+        neighbors_below — entries strictly worse (DESC robust_acc, closest first)
+        snapshot_date   — ISO date the snapshot was frozen — printed in every
+                          render so staleness is never hidden
+        dataset, threat — which leaderboard this is from
+    """
+
+    model_name: str
+    robust_acc: float
+    rank: int
+    total: int
+    neighbors_above: list
+    neighbors_below: list
+    snapshot_date: str
+    dataset: str
+    threat: str
+
+    @property
+    def percentile(self) -> float:
+        """Percentile rank: 100% at rank 1, drops linearly to ~0% at rank=total."""
+        if self.total <= 0:
+            return 0.0
+        return (1.0 - (self.rank - 1) / self.total) * 100.0
+
+    def __str__(self) -> str:
+        title = f"RobustBench {self.dataset}/{self.threat} — {self.model_name}"
+        lines = [title, "=" * len(title)]
+        lines.append(f"Rank:         {self.rank} of {self.total}   (top {self.percentile:.1f}%)")
+        lines.append(f"Robust acc:   {self.robust_acc:.4f}")
+        lines.append(f"Snapshot:     {self.snapshot_date} ({self.total} entries)")
+
+        if self.neighbors_above:
+            lines.append("")
+            lines.append("Neighbors above (better):")
+            lines.extend(self._format_neighbor_row(e) for e in self.neighbors_above)
+
+        if self.neighbors_below:
+            lines.append("")
+            lines.append("Neighbors below (worse):")
+            lines.extend(self._format_neighbor_row(e) for e in self.neighbors_below)
+
+        return "\n".join(lines)
+
+    def _format_neighbor_row(self, entry: dict) -> str:
+        # Delta in percentage points relative to this model's robust_acc.
+        delta_pp = (entry["robust_acc"] - self.robust_acc) * 100.0
+        # name column is left-padded to 38; longer names spill rightward (paper
+        # display can word-wrap or shrink the font — we don't truncate).
+        return (
+            f"  #{entry['rank']:<4} "
+            f"{entry['name']:<38s} "
+            f"{entry['robust_acc']:.4f}   "
+            f"({delta_pp:+.2f} pp)"
+        )
