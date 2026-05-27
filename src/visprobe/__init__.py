@@ -35,7 +35,7 @@ from .perturbations import (
     Brightness,
     LowLight,
 )
-from .attacks import AttackFactory
+from . import attacks
 
 __all__ = [
     "CompositionalExperiment",
@@ -46,5 +46,5 @@ __all__ = [
     "GaussianNoise",
     "Brightness",
     "LowLight",
-    "AttackFactory",
+    "attacks",
 ]

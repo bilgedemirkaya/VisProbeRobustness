@@ -6,11 +6,10 @@ Supports both live data and loading from disk.
 import pickle
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 from datetime import datetime
 
 
@@ -137,78 +136,6 @@ class CompositionalResults:
 
         return auc
 
-    # =========================================================================
-    # Visualization
-    # =========================================================================
-
-    def plot_compositional(
-        self,
-        save_path: Optional[str] = None,
-        figsize: Tuple[int, int] = (15, 10)
-    ):
-        """
-        Plot compositional robustness results.
-
-        Creates a grid of plots showing accuracy vs severity for each scenario.
-
-        Args:
-            save_path: Path to save the figure
-            figsize: Figure size
-        """
-        models = self.get_models()
-        scenarios = self.get_scenarios()
-
-        if not models or not scenarios:
-            print("No data to plot")
-            return
-
-        # Create subplot grid
-        n_scenarios = len(scenarios)
-        n_cols = min(3, n_scenarios)
-        n_rows = (n_scenarios + n_cols - 1) // n_cols
-
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
-        if n_rows == 1 and n_cols == 1:
-            axes = [[axes]]
-        elif n_rows == 1:
-            axes = [axes]
-        elif n_cols == 1:
-            axes = [[ax] for ax in axes]
-
-        # Plot each scenario
-        for idx, scenario in enumerate(scenarios):
-            row = idx // n_cols
-            col = idx % n_cols
-            ax = axes[row][col]
-
-            for model_name in models:
-                if scenario in self.data[model_name]:
-                    severities = sorted(self.data[model_name][scenario].keys())
-                    accuracies = [self.data[model_name][scenario][s].accuracy
-                                for s in severities]
-                    ax.plot(severities, accuracies, marker='o', label=model_name)
-
-            ax.set_xlabel('Severity')
-            ax.set_ylabel('Accuracy')
-            ax.set_title(f'{scenario}')
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-            ax.set_ylim([0, 1])
-
-        # Hide empty subplots
-        for idx in range(n_scenarios, n_rows * n_cols):
-            row = idx // n_cols
-            col = idx % n_cols
-            axes[row][col].axis('off')
-
-        plt.suptitle('Compositional Robustness Results', fontsize=14)
-        plt.tight_layout()
-
-        if save_path:
-            plt.savefig(save_path, dpi=150, bbox_inches='tight')
-            print(f"Plot saved to {save_path}")
-        else:
-            plt.show()
 
     # =========================================================================
     # Serialization
@@ -232,7 +159,6 @@ class CompositionalResults:
         with open(save_dir / 'results.pkl', 'wb') as f:
             pickle.dump(self.data, f)
 
-        # Save summary as JSON for easy inspection
         summary = self._create_summary()
         with open(save_dir / 'summary.json', 'w') as f:
             json.dump(summary, f, indent=2)

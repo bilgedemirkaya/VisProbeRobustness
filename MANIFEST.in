@@ -4,6 +4,7 @@ include CHANGELOG.md
 include ROADMAP.md
 recursive-include src/visprobe *.py
 recursive-include examples *.ipynb
+prune scripts
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 global-exclude *.pyc

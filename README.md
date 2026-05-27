@@ -74,10 +74,11 @@ Reload later, on any machine:
 ```python
 from visprobe import CompositionalResults
 results = CompositionalResults.load("./results")
-results.plot_compositional()
+results.print_summary()
 ```
 
 A full walkthrough lives in [examples/visprobe_walkthrough.ipynb](examples/visprobe_walkthrough.ipynb).
+A matplotlib plotting recipe (faceted line plot + heatmap) lives in [examples/plotting.ipynb](examples/plotting.ipynb) — copy what you need; it's intentionally not part of the library.
 
 ## Attack modes
 
@@ -118,12 +119,14 @@ Two distinct comparisons in one command: the **official rank** (under RobustBenc
 ```
 src/visprobe/
 ├── experiment.py     # CompositionalExperiment runner
-├── checkpoint.py     # CheckpointManager: per-cell save/resume
+├── checkpoint.py     # per-cell save/resume (module functions)
 ├── memory.py         # ModelMemoryManager: CPU <-> GPU swapping
-├── attacks.py        # AttackFactory: AutoAttack, APGD-CE, PGD, none
+├── attacks.py        # attacks.build(): AutoAttack, APGD-CE, PGD, none
 ├── perturbations.py  # 4 environmental perturbations
-└── results.py        # CompositionalResults: save/load, summary, plotting
+└── results.py        # CompositionalResults: save/load, summary
 ```
+
+Plotting helpers live in [examples/plotting.ipynb](examples/plotting.ipynb) — copy and edit, don't import.
 
 ## License
 
