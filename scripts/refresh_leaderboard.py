@@ -144,6 +144,14 @@ def transform_entries(tar: tarfile.TarFile, dataset: str, threat: str) -> list[d
 
 
 def write_snapshot(dataset: str, threat: str, eps: float, entries: list[dict], out_path: Path) -> None:
+    """Write the snapshot, preserving ``snapshot_date`` when entries are unchanged.
+
+    The weekly CI workflow refreshes this file every Monday. Without this
+    check, ``snapshot_date`` would update every run and produce a spurious
+    PR with only a date diff. Preserving the old date when nothing else
+    changed makes the CI quiet by default — PRs land only when RobustBench
+    itself published something new.
+    """
     snapshot = {
         "schema_version": SCHEMA_VERSION,
         "dataset": dataset,
@@ -152,6 +160,23 @@ def write_snapshot(dataset: str, threat: str, eps: float, entries: list[dict], o
         "snapshot_date": date.today().isoformat(),
         "entries": entries,
     }
+
+    if out_path.exists():
+        try:
+            with open(out_path) as f:
+                old = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            old = None  # corrupt or unreadable; overwrite with today's date
+        if (
+            isinstance(old, dict)
+            and old.get("entries") == entries
+            and old.get("eps") == eps
+            and old.get("dataset") == dataset
+            and old.get("threat") == threat
+            and old.get("schema_version") == SCHEMA_VERSION
+        ):
+            snapshot["snapshot_date"] = old.get("snapshot_date", snapshot["snapshot_date"])
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(snapshot, f, indent=2)

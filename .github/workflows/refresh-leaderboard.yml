@@ -1,0 +1,48 @@
+name: Refresh RobustBench snapshot
+
+# Re-pulls RobustBench's `model_info/` directory weekly. Opens a PR only if
+# the leaderboard actually moved (entries added / removed / reranked). The
+# refresher preserves `snapshot_date` when entries are unchanged, so a
+# spurious "only the date changed" PR cannot happen.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:       # also manually runnable from the Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run refresher
+        run: python scripts/refresh_leaderboard.py
+
+      - name: Open PR if snapshot changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: src/visprobe/data/*.json
+          branch: auto/refresh-leaderboard
+          delete-branch: true
+          commit-message: "chore: refresh RobustBench leaderboard snapshot"
+          title: "chore: refresh RobustBench leaderboard snapshot"
+          body: |
+            Automated refresh from the upstream RobustBench `model_info/` directory.
+
+            Review the diff in `src/visprobe/data/*.json` before merging:
+            - new entries → expected, normal upstream activity
+            - rank changes → also expected, occasional reranking
+            - removed entries → investigate; entries don't usually disappear
+            - schema or eps changes → STOP, this needs code review
+
+            The refresher preserves `snapshot_date` when entries are
+            unchanged, so this PR only exists because real data moved.
