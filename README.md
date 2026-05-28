@@ -1,6 +1,6 @@
-# VisProbe
+# VisProbe Testing
 
-**Rank your vision model against the RobustBench leaderboard under their exact protocol — then find the failure modes the leaderboard doesn't measure.**
+**Rank your vision model against the RobustBench leaderboard under their exact protocol — then find the real world failure modes the leaderboard doesn't measure.**
 
 Every robust-vision paper reports a "robust accuracy" number, and few are directly comparable unless the protocol matches exactly. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific — and your evaluation only matches them if you ran the *exact* same thing.
 

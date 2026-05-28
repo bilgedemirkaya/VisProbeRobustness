@@ -78,11 +78,19 @@ Changelog = "https://github.com/bilgedemirkaya/VisProbeRobustness/blob/main/CHAN
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["visprobe*"]
 exclude = ["tests*"]
+
+# Belt-and-suspenders: explicit package-data declaration so the leaderboard
+# snapshots are guaranteed to ship in the wheel regardless of the bundled
+# setuptools version (older setuptools didn't default include-package-data
+# to True for pyproject.toml projects -- this broke CI builds on Python 3.10).
+[tool.setuptools.package-data]
+visprobe = ["data/*.json", "data/*.md"]
 
 # Black configuration
 [tool.black]
