@@ -1,0 +1,6 @@
+model,sev_0.0,sev_0.5,sev_1.0,published_AA_standard,apgd_ce_inflation_pp
+Wang2023Better_WRN-70-16,0.74,0.643,0.449,0.7088,3.12
+Cui2023Decoupled_WRN-28-10,0.706,0.618,0.447,0.6773,2.87
+Rebuffi2021Fixing_70_16_cutmix_extra,0.686,0.606,0.407,0.6658,2.02
+Gowal2020Uncovering_70_16_extra,0.679,0.613,0.449,0.6543,2.47
+Carmon2019Unlabeled,0.609,0.548,0.396,0.5961,1.29

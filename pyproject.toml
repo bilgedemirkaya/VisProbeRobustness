@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "visprobe"
-version = "2.0.0"
+version = "3.0.0"
 description = "Simple, production-ready compositional robustness testing for vision models"
 readme = "README.md"
 requires-python = ">=3.8"
