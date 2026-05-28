@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "dataset": "imagenet",
+  "threat": "Linf",
+  "eps": 0.01568627450980392,
+  "snapshot_date": "2026-05-27",
+  "entries": [
+    {
+      "rank": 1,
+      "name": "Amini2024MeanSparse_Swin-L",
+      "paper": "https://arxiv.org/abs/2406.05927",
+      "venue": "arXiv, Jun 2024",
+      "architecture": "MeanSparse Swin-L",
+      "clean_acc": 0.788,
+      "robust_acc": 0.6212
+    },
+    {
+      "rank": 2,
+      "name": "Xu2024MIMIR_Swin-L",
+      "paper": "https://arxiv.org/abs/2312.04960",
+      "venue": "arXiv, Dec 2023",
+      "architecture": "Swin-L",
+      "clean_acc": 0.7862,
+      "robust_acc": 0.5968
+    },
+    {
+      "rank": 3,
+      "name": "Amini2024MeanSparse_ConvNeXt-L",
+      "paper": "https://arxiv.org/abs/2406.05927",
+      "venue": "arXiv, Jun 2024",
+      "architecture": "MeanSparse ConvNeXt-L",
+      "clean_acc": 0.7792,
+      "robust_acc": 0.5964
+    },
+    {
+      "rank": 4,
+      "name": "Liu2023Comprehensive_Swin-L",
+      "paper": "https://arxiv.org/abs/2302.14301",
+      "venue": "arXiv, Feb 2023",
+      "architecture": "Swin-L",
+      "clean_acc": 0.7892,
+      "robust_acc": 0.5956
+    },
+    {
+      "rank": 5,
+      "name": "Bai2024MixedNUTS",
+      "paper": "https://arxiv.org/abs/2402.02263",
+      "venue": "TMLR, Aug 2024",
+      "architecture": "ConvNeXtV2-L + Swin-L",
+      "clean_acc": 0.8148,
+      "robust_acc": 0.585
+    },
+    {
+      "rank": 6,
+      "name": "Liu2023Comprehensive_ConvNeXt-L",
+      "paper": "https://arxiv.org/abs/2302.14301",
+      "venue": "arXiv, Feb 2023",
+      "architecture": "ConvNeXt-L",
+      "clean_acc": 0.7802,
+      "robust_acc": 0.5848
+    },
+    {
+      "rank": 7,
+      "name": "Singh2023Revisiting_ConvNeXt-L-ConvStem",
+      "paper": "https://arxiv.org/abs/2303.01870",
+      "venue": "NeurIPS 2023",
+      "architecture": "ConvNeXt-L + ConvStem",
+      "clean_acc": 0.77,
+      "robust_acc": 0.577
+    },
+    {
+      "rank": 8,
+      "name": "Liu2023Comprehensive_Swin-B",
+      "paper": "https://arxiv.org/abs/2302.14301",
+      "venue": "arXiv, Feb 2023",
+      "architecture": "Swin-B",
+      "clean_acc": 0.7616,
+      "robust_acc": 0.5616
+    },
+    {
+      "rank": 9,
+      "name": "Singh2023Revisiting_ConvNeXt-B-ConvStem",
+      "paper": "https://arxiv.org/abs/2303.01870",
+      "venue": "NeurIPS 2023",
+      "architecture": "ConvNeXt-B + ConvStem",
+      "clean_acc": 0.759,
+      "robust_acc": 0.5614
+    },
+    {
+      "rank": 10,
+      "name": "Xu2024MIMIR_Swin-B",
+      "paper": "https://arxiv.org/abs/2312.04960",
+      "venue": "arXiv, Dec 2023",
+      "architecture": "Swin-B",
+      "clean_acc": 0.7662,
+      "robust_acc": 0.559
+    },
+    {
+      "rank": 11,
+      "name": "Liu2023Comprehensive_ConvNeXt-B",
+      "paper": "https://arxiv.org/abs/2302.14301",
+      "venue": "arXiv, Feb 2023",
+      "architecture": "ConvNeXt-B",
+      "clean_acc": 0.7602,
+      "robust_acc": 0.5582
+    },
+    {
+      "rank": 12,
+      "name": "Singh2023Revisiting_ViT-B-ConvStem",
+      "paper": "https://arxiv.org/abs/2303.01870",
+      "venue": "NeurIPS 2023",
+      "architecture": "ViT-B + ConvStem",
+      "clean_acc": 0.763,
+      "robust_acc": 0.5466
+    },
+    {
+      "rank": 13,
+      "name": "RodriguezMunoz2024Characterizing_Swin-L",
+      "paper": "https://arxiv.org/abs/2409.20139",
+      "venue": "arXiv, Sep 2024",
+      "architecture": "Swin-L",
+      "clean_acc": 0.7936,
+      "robust_acc": 0.5382
+    },
+    {
+      "rank": 14,
+      "name": "Singh2023Revisiting_ConvNeXt-S-ConvStem",
+      "paper": "https://arxiv.org/abs/2303.01870",
+      "venue": "NeurIPS 2023",
+      "architecture": "ConvNeXt-S + ConvStem",
+      "clean_acc": 0.741,
+      "robust_acc": 0.5242
+    },
+    {
+      "rank": 15,
+      "name": "RodriguezMunoz2024Characterizing_Swin-B",
+      "paper": "https://arxiv.org/abs/2409.20139",
+      "venue": "arXiv, Sep 2024",
+      "architecture": "Swin-B",
+      "clean_acc": 0.7776,
+      "robust_acc": 0.5156
+    },
+    {
+      "rank": 16,
+      "name": "Singh2023Revisiting_ConvNeXt-T-ConvStem",
+      "paper": "https://arxiv.org/abs/2303.01870",
+      "venue": "NeurIPS 2023",
+      "architecture": "ConvNeXt-T + ConvStem",
+      "clean_acc": 0.7272,
+      "robust_acc": 0.4946
+    },
+    {
+      "rank": 17,
+      "name": "Peng2023Robust",
+      "paper": "https://arxiv.org/abs/2308.16258",
+      "venue": "BMVC 2023",
+      "architecture": "RaWideResNet-101-2",
+      "clean_acc": 0.7344,
+      "robust_acc": 0.4894
+    },
+    {
+      "rank": 18,
+      "name": "Singh2023Revisiting_ViT-S-ConvStem",
+      "paper": "https://arxiv.org/abs/2303.01870",
+      "venue": "NeurIPS 2023",
+      "architecture": "ViT-S + ConvStem",
+      "clean_acc": 0.7256,
+      "robust_acc": 0.4808
+    },
+    {
+      "rank": 19,
+      "name": "Debenedetti2022Light_XCiT-L12",
+      "paper": "https://arxiv.org/abs/2209.07399",
+      "venue": "arXiv, Sep 2022",
+      "architecture": "XCiT-L12",
+      "clean_acc": 0.7376,
+      "robust_acc": 0.476
+    },
+    {
+      "rank": 20,
+      "name": "Debenedetti2022Light_XCiT-M12",
+      "paper": "https://arxiv.org/abs/2209.07399",
+      "venue": "arXiv, Sep 2022",
+      "architecture": "XCiT-M12",
+      "clean_acc": 0.7404,
+      "robust_acc": 0.4524
+    },
+    {
+      "rank": 21,
+      "name": "Chen2024Data_WRN_50_2",
+      "paper": "https://doi.org/10.1016/j.patcog.2024.110394",
+      "venue": "Pattern Recognition 2024",
+      "architecture": "WideResNet-50-2",
+      "clean_acc": 0.6876,
+      "robust_acc": 0.4192
+    },
+    {
+      "rank": 22,
+      "name": "Debenedetti2022Light_XCiT-S12",
+      "paper": "https://arxiv.org/abs/2209.07399",
+      "venue": "arXiv, Sep 2022",
+      "architecture": "XCiT-S12",
+      "clean_acc": 0.7234,
+      "robust_acc": 0.4178
+    },
+    {
+      "rank": 23,
+      "name": "Mo2022When_Swin-B",
+      "paper": "https://arxiv.org/abs/2210.07540",
+      "venue": "NeurIPS 2022",
+      "architecture": "Swin-B",
+      "clean_acc": 0.7466,
+      "robust_acc": 0.383
+    },
+    {
+      "rank": 24,
+      "name": "Mo2022When_ViT-B",
+      "paper": "https://arxiv.org/abs/2210.07540",
+      "venue": "NeurIPS 2022",
+      "architecture": "ViT-B",
+      "clean_acc": 0.6838,
+      "robust_acc": 0.344
+    },
+    {
+      "rank": 25,
+      "name": "Engstrom2019Robustness",
+      "paper": "https://github.com/MadryLab/robustness",
+      "venue": "GitHub,<br>Oct 2019",
+      "architecture": "ResNet-50",
+      "clean_acc": 0.6256,
+      "robust_acc": 0.3338
+    },
+    {
+      "rank": 26,
+      "name": "Wong2020Fast",
+      "paper": "https://arxiv.org/abs/2001.03994",
+      "venue": "ICLR 2020",
+      "architecture": "ResNet-50",
+      "clean_acc": 0.5562,
+      "robust_acc": 0.3018
+    },
+    {
+      "rank": 27,
+      "name": "Standard_R50",
+      "paper": "https://github.com/RobustBench/robustbench/",
+      "venue": "N/A",
+      "architecture": "ResNet-50",
+      "clean_acc": 0.7652,
+      "robust_acc": 0.0
+    }
+  ]
+}

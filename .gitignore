@@ -74,6 +74,13 @@ data/
 *.pt
 *.safetensors
 
+# But: the leaderboard snapshots in the package are required for runtime.
+# These MUST be committed; CI builds the wheel from a fresh clone and needs
+# them on disk for the wheel to include them.
+!src/visprobe/data/
+!src/visprobe/data/*.json
+!src/visprobe/data/*.md
+
 # Logs
 *.log
 logs/
@@ -91,6 +98,8 @@ checkpoints/
 *_checkpoints/
 *.json
 !config/*.json
+!src/visprobe/data/*.json
+!src/visprobe/data/*.md
 *.png
 *.jpg
 *.jpeg
