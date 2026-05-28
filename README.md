@@ -1,133 +1,179 @@
 # VisProbe
 
-**Test your vision model the way it should be tested, under real-world conditions.**
+**Rank your vision model against the RobustBench leaderboard under their exact protocol — then find the failure modes the leaderboard doesn't measure.**
 
-Let's say your image classifier has a high accuracy on a test set. How would it actually perform when the camera is noisy, the lighting drops and someone adversarially crafts input at the same time? Pure AutoAttack benchmarks do not account for real-world scenarios like this, and regular tests assume pristine images which hide failures. Real deployments are complex and often underperform in such imperfect conditions.
+Every robust-vision paper reports a "robust accuracy" number, and almost none of them are directly comparable. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific — and your evaluation only matches them if you ran the *exact* same thing.
 
-VisProbe expands upon AutoAttack by performing additional tests on your model to evaluate real-world conditions. In a nutshell, VisProbe sweeps your model across `environment × adversarial-attack × severity` in one command and tells you where it actually breaks.
+VisProbe does two things, both in service of numbers you can defend:
 
-## What you get
+1. **Compute a leaderboard rank under strict protocol enforcement.** You either match the RobustBench protocol byte-for-byte and get a comparable rank, or VisProbe refuses to produce one. No silent disagreement with the published numbers.
+2. **Sweep that same model across `environment × attack × severity`.** A model that ranks #14 on pristine images can collapse under low light combined with attack — a failure mode the leaderboard never surfaces. The rank tells you where you sit on paper; the sweep tells you what your users will actually hit.
 
-**When evaluating one model:**
-- Run a sweep with one command and obtain accuracy curves across blur, noise, low-light, and brightness — each combined with adversarial attack at multiple severities.
-- The interaction effects are where models fail in practice and where pure attack benchmarks are silent.
+## 1. Where do I sit on the leaderboard?
 
-**For long experiments:**
-- Every `(model, scenario, severity)` cell is checkpointed as soon as it finishes. Kernel crash, session timeout, manual cancel — rerun and it picks up exactly where it stopped.
+```python
+from visprobe import robustbench_eval, CompositionalResults
 
-**For multi-model comparisons:**
-- One model on the GPU, the rest swapped to CPU automatically. Compare 4-5 architectures on a single 24GB card without OOM.
+# 5-25 hours on A100, ~$15-70. confirm=True is required so you see the cost first.
+result = robustbench_eval(model, "cifar10", "Linf", confirm=True)
 
-**For separating compute from analysis:**
-- Save the experiment to disk once; reload it on any machine. The expensive part needs a GPU and model weights; the analysis (plots, summaries, comparisons) needs neither. Run on a server, analyze on a laptop, share with a collaborator.
-
-## Install
-
-```bash
-pip install visprobe              # core
-pip install visprobe[autoattack]  # adds AutoAttack
+results = CompositionalResults()
+results.add_result("my_model", "none", 0.0, result)
+print(results.compare_to_leaderboard("my_model", "cifar10", "Linf"))
 ```
 
-## Quick start
+```
+RobustBench cifar10/Linf — my_model
+====================================
+Rank:         14 of 99   (top 14.1%)
+Robust acc:   0.6789
+Protocol:     autoattack-standard, eps=8/255 (full RobustBench Linf)
+Snapshot:     2026-05-27
+
+Neighbors above (better):
+  #11   Wang2024Foo                            0.6912   (+1.23 pp)
+  #12   Bai2024Bar                             0.6856   (+0.67 pp)
+  #13   Cui2023Baz                             0.6823   (+0.34 pp)
+
+Neighbors below (worse):
+  #15   Gowal2023Qux                           0.6745   (-0.44 pp)
+  #16   Rebuffi2022Quux                        0.6710   (-0.79 pp)
+  #17   Carmon2021Corge                        0.6680   (-1.09 pp)
+```
+
+That's the number you can put in a paper and defend.
+
+## Why the protocol matters
+
+"Robust accuracy under AutoAttack" varies between papers in ways that quietly destroy comparability:
+
+- APGD-CE only, or the full AutoAttack suite (4 sub-attacks). APGD-CE typically reports 1-3 pp higher.
+- 1000 samples, or 10000. Standard error scales with √N.
+- eps=8/255, eps=4/255, or something else entirely.
+- With or without test-time augmentation.
+
+"I beat the leaderboard" stops meaning what it sounds like. It becomes "I beat my version of it."
+
+VisProbe pins the protocol per `(dataset, threat)` combo and validates it on every rank call.
+
+### The protocols
+
+Each RobustBench leaderboard has its own fixed evaluation:
+
+| Leaderboard | Attack | eps | Samples | Ships in v3? |
+|---|---|---|---|---|
+| `cifar10` / `Linf` | autoattack-standard | 8/255 | 10000 | ✓ |
+| `cifar100` / `Linf` | autoattack-standard | 8/255 | 10000 | ✓ |
+| `imagenet` / `Linf` | autoattack-standard | 4/255 | 5000 | ✓ |
+| `cifar10` / `L2` | autoattack-standard | 0.5 | 10000 | later |
+| `cifar10` / `corruptions` | *no attack — uses CIFAR-10-C* | n/a | per corruption | later |
+
+`autoattack-standard` is the full AutoAttack suite (APGD-CE + APGD-DLR + FAB + Square). The `corruptions` threat is a different evaluation entirely — the model is graded on pre-computed corrupted images rather than an adversary — so its protocol shape is fundamentally different and v3 doesn't cover it yet.
+
+### What the gate checks
+
+On every `compare_to_leaderboard()` call, VisProbe validates your `EvaluationResult` against the protocol for the requested `(dataset, threat)`:
+
+- `metadata.protocol == "robustbench"` — only `robustbench_eval()` sets this, so arbitrary `CompositionalExperiment` outputs can't accidentally claim a rank.
+- `attack` matches the expected attack for that threat.
+- `eps` matches the threat's eps (within float tolerance).
+- `n_samples` matches the protocol sample count.
+- `attacks_to_run` matches, when the attack is an AutoAttack variant.
+
+Any mismatch raises `ProtocolError` with the full list of violations and no attempt to approximate:
+
+```
+ProtocolError: Cannot rank against RobustBench cifar10/Linf — protocol mismatch:
+  - attack='autoattack-apgd-ce', expected 'autoattack-standard'
+  - n_samples=1000, expected 10000
+  - eps=0.0156862745, expected 0.0313725490
+
+Fix: use robustbench_eval(model, dataset='cifar10', threat='Linf') to produce
+a protocol-compliant result, or check that result.metadata survived any
+serialization round-trip that might have stripped it.
+```
+
+There's no honest way to convert a 1000-sample APGD-CE number into a 10000-sample full-AutoAttack number, so the gate just refuses. The number you publish is the number you can defend.
+
+## 2. Where does the rank lie?
+
+A leaderboard rank is one point in a much larger evaluation space. It says nothing about how your model behaves when the camera is noisy, when the lighting drops, when an attacker exploits both at once. Real deployments rarely give you the pristine inputs RobustBench evaluates on.
+
+For that, sweep the same model across `environment × adversarial-attack × severity` and look at where it actually breaks:
 
 ```python
 from visprobe import CompositionalExperiment, get_standard_perturbations
 
 experiment = CompositionalExperiment(
-    models={"resnet50": model},
-    images=images,                          # (N, C, H, W) in [0, 1]
-    labels=labels,                          # (N,)
-    env_strategies=get_standard_perturbations(),
-    attack="autoattack-apgd-ce",            # fast AutoAttack mode
+    models={"my_model": model},
+    images=images,
+    labels=labels,
+    env_strategies=get_standard_perturbations(),   # blur, noise, brightness, lowlight
+    attack="autoattack-apgd-ce",
     severities=[0.0, 0.25, 0.5, 0.75, 1.0],
     eps_fn=lambda s: (8 / 255) * s,
-    checkpoint_dir="./checkpoints",
+    checkpoint_dir="./checkpoints",                # auto-resumes if interrupted
 )
-
-results = experiment.run()                  # auto-resumes if interrupted
-results.print_summary()
+results = experiment.run()
 results.save("./results")
 ```
 
-**Example output:**
+Run both — the leaderboard rank tells you where you sit, the compositional sweep tells you what your deployment faces. A model can sit at #14 on the official leaderboard and still lose 80% of its robust accuracy when low light is added to the same attack. That gap is where the interesting failure modes hide.
 
-```
-VisProbe Compositional Robustness Report
-========================================
-Model: resnet50 (24M params)
-Clean accuracy:          94.2%
-Robust accuracy (AA):    12.4%
+## Install
 
-Compositional degradation:
-  blur + AA:        94.2% → 8.1%    (-86 pp at max severity)
-  noise + AA:       94.2% → 11.3%   (-83 pp at max severity)
-  brightness + AA:  94.2% → 9.7%    (-84 pp at max severity)
-  lowlight + AA:    94.2% →  2.1%   (-92 pp at max severity)   ← weakest
-
-Results saved to ./results/   •   3m 42s
+```bash
+pip install visprobe              # core: compositional eval, PGD attack only
+pip install "visprobe[all]"       # adds AutoAttack + RobustBench (needed for leaderboard rank)
 ```
 
-The `lowlight + AA` row is the kind of failure mode a pure AutoAttack benchmark never surfaces — *the model is nearly six times more fragile under low light than under a clean attack*. That's the entire point of running the composition.
+If `pip install autoattack` fails (the PyPI version sometimes lags), install from GitHub:
 
-Reload later, on any machine:
-
-```python
-from visprobe import CompositionalResults
-results = CompositionalResults.load("./results")
-results.print_summary()
+```bash
+pip install visprobe[robustbench]
+pip install git+https://github.com/fra31/auto-attack
 ```
-
-A full walkthrough lives in [examples/visprobe_walkthrough.ipynb](examples/visprobe_walkthrough.ipynb).
-A matplotlib plotting recipe (faceted line plot + heatmap) lives in [examples/plotting.ipynb](examples/plotting.ipynb) — copy what you need; it's intentionally not part of the library.
 
 ## Attack modes
 
-| `attack=` | What it does |
+| `attack=` | Use |
 |---|---|
-| `"autoattack-standard"` | Full AutoAttack (APGD-CE + APGD-DLR + FAB + Square). Most thorough, slowest. |
-| `"autoattack-apgd-ce"` | APGD-CE only. ~5x faster, the right default for sweeps. |
-| `"pgd"` | Standard PGD-Linf. |
-| `"none"` | No attack; environmental-only robustness. |
+| `"autoattack-standard"` | Full AutoAttack. Required for `robustbench_eval`. |
+| `"autoattack-apgd-ce"` | APGD-CE only. ~5x faster. For compositional sweeps; not for leaderboard rank. |
+| `"pgd"` | Standard PGD-Linf. Debugging or speed-sensitive sweeps. |
+| `"none"` | Identity. Environment-only robustness. |
 
-`eps_fn(severity)` controls the attack budget per severity step. For Linf, `lambda s: (8/255) * s` is a sensible default.
+## Coming in v3.1
 
-## Perturbations
+**Head-to-head on your data.** Download the top-k published robust models, re-evaluate them on *your* images under *your* compositional protocol, and rank yourself alongside. Distinct from the official rank: the output carries a `data_source: user` label everywhere so the two cannot be confused.
 
-`get_standard_perturbations()` returns the four supported degradations:
+## Why you can trust the numbers
 
-```python
-{
-    "blur":       GaussianBlur(sigma_max=3.0),
-    "noise":      GaussianNoise(std_max=0.1),
-    "brightness": Brightness(delta_max=0.3),
-    "lowlight":   LowLight(gamma_max=5.0),
-}
-```
+The protocol gate is the load-bearing claim in this README. Saying "your rank matches RobustBench" is only useful if it actually does, and the only way to know it actually does is to test the failure surface ruthlessly.
 
-Each is a callable `(images, severity) -> images` where `severity=0` is a no-op. Pass your own dictionary into `env_strategies=` to use custom perturbations.
+So `validate_protocol` carries one assertion per failure mode — attack-type mismatch, eps mismatch, n_samples mismatch, attacks-to-run mismatch, metadata-stripped-by-pickle — each with an explicit substring contract on the error message. Wording can't silently regress, which is what would let a wrong number slip through. **130 tests** total across the suite, run on every push against Ubuntu/macOS/Windows × Python 3.9/3.10/3.11. See [TESTING.md](TESTING.md) for the detailed test map.
 
-## Roadmap — coming in v3
-
-**RobustBench leaderboard integration.** After your run finishes, get back something like:
-
-> *Your model would rank #14 on the ImageNet Linf leaderboard. Closest comparable is `Liu2023_Swin-B` at +4.1 pp robust accuracy. Head-to-head on your data: your model beats `Liu2023_Swin-B` under `noise + AA` but loses by 11 pp under `lowlight + AA`.*
-
-Two distinct comparisons in one command: the **official rank** (under RobustBench's strict protocol) and a **head-to-head** that re-evaluates the top-k published robust models *on your data*, so you see how they hold up under the same compositional conditions yours just failed. See [ROADMAP.md](ROADMAP.md) for the full design.
 
 ## Architecture
 
 ```
 src/visprobe/
-├── experiment.py     # CompositionalExperiment runner
+├── experiment.py     # CompositionalExperiment + robustbench_eval
+├── leaderboard.py    # validate_protocol + RobustBenchClient + LeaderboardComparison
 ├── checkpoint.py     # per-cell save/resume (module functions)
-├── memory.py         # ModelMemoryManager: CPU <-> GPU swapping
-├── attacks.py        # attacks.build(): AutoAttack, APGD-CE, PGD, none
-├── perturbations.py  # 4 environmental perturbations
-└── results.py        # CompositionalResults: save/load, summary
+├── memory.py         # one model on GPU at a time, rest swapped to CPU
+├── attacks.py        # attacks.build(): AutoAttack standard/APGD-CE, PGD, none
+├── perturbations.py  # 4 environmental perturbations: blur, noise, brightness, lowlight
+└── results.py        # CompositionalResults: save/load, summary, ranking
 ```
 
-Plotting helpers live in [examples/plotting.ipynb](examples/plotting.ipynb) — copy and edit, don't import.
+Leaderboard snapshots ship in `src/visprobe/data/`. CI refreshes them weekly via [.github/workflows/refresh-leaderboard.yml](.github/workflows/refresh-leaderboard.yml).
+
+## Examples
+
+- [examples/visprobe_walkthrough.ipynb](examples/visprobe_walkthrough.ipynb) — full compositional-eval workflow end to end.
+- [examples/plotting.ipynb](examples/plotting.ipynb) — matplotlib recipes (faceted accuracy curves + heatmap).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT.
