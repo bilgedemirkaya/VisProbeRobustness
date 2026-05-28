@@ -2,19 +2,19 @@
 
 **Rank your vision model against the RobustBench leaderboard under their exact protocol — then find the failure modes the leaderboard doesn't measure.**
 
-Every robust-vision paper reports a "robust accuracy" number, and almost none of them are directly comparable. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific — and your evaluation only matches them if you ran the *exact* same thing.
+Every robust-vision paper reports a "robust accuracy" number, and few are directly comparable unless the protocol matches exactly. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific — and your evaluation only matches them if you ran the *exact* same thing.
 
-VisProbe does two things, both in service of numbers you can defend:
+VisProbe does two things: a defensible rank, plus the failure modes the rank misses.
 
 1. **Compute a leaderboard rank under strict protocol enforcement.** You either match the RobustBench protocol byte-for-byte and get a comparable rank, or VisProbe refuses to produce one. No silent disagreement with the published numbers.
-2. **Sweep that same model across `environment × attack × severity`.** A model that ranks #14 on pristine images can collapse under low light combined with attack — a failure mode the leaderboard never surfaces. The rank tells you where you sit on paper; the sweep tells you what your users will actually hit.
+2. **Sweep that same model across `environment × attack × severity`.** A model that ranks well on pristine images can collapse on inputs a real camera produces — those failure modes don't show up on the leaderboard. The rank tells you where you sit on paper; the sweep tells you what your users will actually hit.
 
 ## 1. Where do I sit on the leaderboard?
 
 ```python
 from visprobe import robustbench_eval, CompositionalResults
 
-# 5-25 hours on A100, ~$15-70. confirm=True is required so you see the cost first.
+# CIFAR-10 ~5h, ~$15 on A100  |  ImageNet ~25h, ~$70. confirm=True is required so you see the cost first.
 result = robustbench_eval(model, "cifar10", "Linf", confirm=True)
 
 results = CompositionalResults()
@@ -54,7 +54,7 @@ That's the number you can put in a paper and defend.
 
 "I beat the leaderboard" stops meaning what it sounds like. It becomes "I beat my version of it."
 
-VisProbe pins the protocol per `(dataset, threat)` combo and validates it on every rank call.
+VisProbe pins the protocol per `(dataset, threat)` pair and validates it on every rank call.
 
 ### The protocols
 
@@ -78,7 +78,6 @@ On every `compare_to_leaderboard()` call, VisProbe validates your `EvaluationRes
 - `attack` matches the expected attack for that threat.
 - `eps` matches the threat's eps (within float tolerance).
 - `n_samples` matches the protocol sample count.
-- `attacks_to_run` matches, when the attack is an AutoAttack variant.
 
 Any mismatch raises `ProtocolError` with the full list of violations and no attempt to approximate:
 
@@ -95,7 +94,7 @@ serialization round-trip that might have stripped it.
 
 There's no honest way to convert a 1000-sample APGD-CE number into a 10000-sample full-AutoAttack number, so the gate just refuses. The number you publish is the number you can defend.
 
-## 2. Where does the rank lie?
+## 2. What the leaderboard rank misses
 
 A leaderboard rank is one point in a much larger evaluation space. It says nothing about how your model behaves when the camera is noisy, when the lighting drops, when an attacker exploits both at once. Real deployments rarely give you the pristine inputs RobustBench evaluates on.
 
@@ -114,25 +113,25 @@ experiment = CompositionalExperiment(
     eps_fn=lambda s: (8 / 255) * s,
     checkpoint_dir="./checkpoints",                # auto-resumes if interrupted
 )
-results = experiment.run()
+results = experiment.run()                     # prints cost estimate; pass confirm=True for sweeps > ~1h or ~$5
 results.save("./results")
 ```
 
-Run both — the leaderboard rank tells you where you sit, the compositional sweep tells you what your deployment faces. A model can sit at #14 on the official leaderboard and still lose 80% of its robust accuracy when low light is added to the same attack. That gap is where the interesting failure modes hide.
+Run both — the leaderboard rank tells you where you sit, the compositional sweep tells you what your deployment faces. In our pilot on CIFAR-10, **Wang2023, the #1 ranked model on RobustBench Linf, drops from 74% robust accuracy on clean inputs to 45% once Gaussian noise is added** (pilot: APGD-CE on 1000 samples — the strict-protocol leaderboard number is 71%). **Gowal2020 (~#30 on the leaderboard) ties Wang2023 under that noise condition** — the #1-vs-#30 distinction collapses on inputs any real camera would produce. The gap between official rank and compositional behavior is where the interesting failure modes hide. Full pilot table: [pilot_grid.csv](pilot_grid.csv).
 
 ## Install
 
 ```bash
-pip install visprobe              # core: compositional eval, PGD attack only
-pip install "visprobe[all]"       # adds AutoAttack + RobustBench (needed for leaderboard rank)
+pip install "visprobe[all]"
 ```
 
-If `pip install autoattack` fails (the PyPI version sometimes lags), install from GitHub:
+That pulls in AutoAttack + RobustBench, which you need for both leaderboard rank and adversarial sweeps. (Bare `pip install visprobe` works but only gives you PGD and environment-only eval.)
 
-```bash
-pip install visprobe[robustbench]
-pip install git+https://github.com/fra31/auto-attack
-```
+> If `pip install` can't find `autoattack` (the PyPI package occasionally lags), install it from GitHub instead:
+> ```bash
+> pip install visprobe[robustbench]
+> pip install git+https://github.com/fra31/auto-attack
+> ```
 
 ## Attack modes
 
@@ -143,16 +142,9 @@ pip install git+https://github.com/fra31/auto-attack
 | `"pgd"` | Standard PGD-Linf. Debugging or speed-sensitive sweeps. |
 | `"none"` | Identity. Environment-only robustness. |
 
-## Coming in v3.1
+## v3.1
 
 **Head-to-head on your data.** Download the top-k published robust models, re-evaluate them on *your* images under *your* compositional protocol, and rank yourself alongside. Distinct from the official rank: the output carries a `data_source: user` label everywhere so the two cannot be confused.
-
-## Why you can trust the numbers
-
-The protocol gate is the load-bearing claim in this README. Saying "your rank matches RobustBench" is only useful if it actually does, and the only way to know it actually does is to test the failure surface ruthlessly.
-
-So `validate_protocol` carries one assertion per failure mode — attack-type mismatch, eps mismatch, n_samples mismatch, attacks-to-run mismatch, metadata-stripped-by-pickle — each with an explicit substring contract on the error message. Wording can't silently regress, which is what would let a wrong number slip through. **130 tests** total across the suite, run on every push against Ubuntu/macOS/Windows × Python 3.9/3.10/3.11. See [TESTING.md](TESTING.md) for the detailed test map.
-
 
 ## Architecture
 

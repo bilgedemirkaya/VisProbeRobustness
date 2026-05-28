@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from . import attacks, checkpoint
+from . import attacks, checkpoint, cost
 from .memory import ModelMemoryManager
 from .perturbations import get_standard_perturbations
 from .results import CompositionalResults, EvaluationResult
@@ -79,8 +79,14 @@ class CompositionalExperiment:
                 format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             )
 
-    def run(self) -> CompositionalResults:
-        """Run the sweep, resuming any cells already on disk in ``checkpoint_dir``."""
+    def run(self, *, confirm: bool = False) -> CompositionalResults:
+        """
+        Run the sweep, resuming any cells already on disk in ``checkpoint_dir``.
+
+        Prints a rough cost estimate at start. If the *remaining* work exceeds
+        ~1 hour or ~$5 of A100 time, raises unless ``confirm=True`` is passed.
+        Short sweeps (debugging, smoke tests) run silently with no gate.
+        """
         results = CompositionalResults()
         results.data = checkpoint.load_all(self.checkpoint_dir)
 
@@ -90,6 +96,23 @@ class CompositionalExperiment:
             for scenarios in results.data.values()
             for s in scenarios
         )
+        remaining = total - already_done
+
+        est = cost.estimate(self.attack_type, remaining, len(self.images))
+        msg = cost.format_estimate(est)
+        if already_done:
+            msg = f"Resuming: {already_done}/{total} cells already complete. {msg}"
+
+        if cost.is_expensive(est) and not confirm:
+            raise RuntimeError(
+                f"{msg}\n\n"
+                f"Estimated cost exceeds the auto-confirm threshold "
+                f"(>{cost.THRESHOLD_HOURS}h or >${cost.THRESHOLD_USD}). "
+                f"Pass confirm=True to proceed, or pick a faster attack "
+                f"(autoattack-apgd-ce, pgd) / smaller sweep."
+            )
+        if self.verbose:
+            print(msg)
         if already_done:
             logger.info("Resuming: %d/%d cells already complete", already_done, total)
 
