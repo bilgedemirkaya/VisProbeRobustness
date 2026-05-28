@@ -124,6 +124,8 @@ cython_debug/
 # Local development
 test_*.py
 !test_refactored.py
+!tests/
+!tests/**
 temp/
 tmp/
 scratch/
