@@ -5,6 +5,18 @@ All notable changes to VisProbe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-05-28
+
+### Fixed
+- Leaderboard snapshots (`src/visprobe/data/*.json`) now reliably ship in the wheel. Older versions of setuptools didn't default `include-package-data=true` for pyproject.toml projects, which silently dropped the snapshots from wheels built on some CI runners. Fixed by explicit `[tool.setuptools.package-data]` declaration.
+- Data files and tests are no longer hidden by the project `.gitignore` template's `data/`, `*.json`, and `test_*.py` rules. Fresh clones now contain everything needed to build a working wheel and run the test suite.
+
+### Changed
+- README rewrite: tightened the opening for a 30-second read, replaced placeholder example output with real RobustBench model names, dropped the "What the gate checks" subsection (the protocol table and `ProtocolError` example cover the same ground more concretely), and removed prose em-dashes.
+
+### Notes
+- No `src/visprobe/*.py` source-code changes since 3.0.0. Users on 3.0.0 with a working install do not need to upgrade; users hitting the missing-snapshot bug on fresh installs do.
+
 ## [3.0.0] - 2026-05-27
 
 ### Added — Feature A: RobustBench leaderboard ranking

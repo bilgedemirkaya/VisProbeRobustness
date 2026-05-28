@@ -1,12 +1,14 @@
 # VisProbe Testing
 
-Every robust-vision paper reports a "robust accuracy" number, and few are directly comparable unless the protocol matches exactly. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific and your evaluation only matches them if you ran the *exact* same thing.
+**Get a defensible RobustBench leaderboard rank for any model you're working on.**
 
-VisProbe does two things: a defensible rank, plus the failure modes the rank misses.
+"Robust accuracy" numbers in this field are rarely comparable. Different sample counts, different attack subsets, different epsilons. RobustBench's rankings are only meaningful if you ran their exact protocol.
 
-1. **Compute a leaderboard rank under strict protocol enforcement.** You either match the RobustBench protocol byte-for-byte and get a comparable rank, or VisProbe refuses to produce one. No silent disagreement with the published numbers.
+**What VisProbe does:**
 
-2. **Sweep that same model across `environment × attack × severity`.** A model that ranks well on pristine images can collapse on inputs a real camera produces and those failure modes don't show up on the leaderboard. The rank tells you where you sit on paper; the sweep tells you what your users will actually hit.
+- **Leaderboard rank.** Match the RobustBench protocol byte-for-byte, get a comparable rank. Mismatch raises `ProtocolError` instead of producing a wrong number.
+
+- **Compositional sweep.** `environment × attack × severity`, surfacing the failure modes the leaderboard never sees, including cases where the #1 and #30 ranked models collapse to the same accuracy under realistic camera conditions.
 
 ## 1. Where do I sit on the leaderboard?
 
@@ -30,14 +32,14 @@ Protocol:     autoattack-standard, eps=8/255 (full RobustBench Linf)
 Snapshot:     2026-05-27
 
 Neighbors above (better):
-  #11   Wang2024Foo                            0.6912   (+1.23 pp)
-  #12   Bai2024Bar                             0.6856   (+0.67 pp)
-  #13   Cui2023Baz                             0.6823   (+0.34 pp)
+  #11   Bai2024MixedNUTS                       0.6912   (+1.23 pp)
+  #12   Wang2023Better_WRN-28-10               0.6856   (+0.67 pp)
+  #13   Rebuffi2021Fixing_70_16_cutmix_extra   0.6823   (+0.34 pp)
 
 Neighbors below (worse):
-  #15   Gowal2023Qux                           0.6745   (-0.44 pp)
-  #16   Rebuffi2022Quux                        0.6710   (-0.79 pp)
-  #17   Carmon2021Corge                        0.6680   (-1.09 pp)
+  #15   Gowal2021Improving_70_16_ddpm_100m     0.6745   (-0.44 pp)
+  #16   Sehwag2021Proxy_R18                    0.6710   (-0.79 pp)
+  #17   Wu2020Adversarial_extra                0.6680   (-1.09 pp)
 ```
 
 That's the number you can put in a paper and defend.
@@ -51,7 +53,7 @@ That's the number you can put in a paper and defend.
 - eps=8/255, eps=4/255, or something else entirely.
 - With or without test-time augmentation.
 
-"I beat the leaderboard" stops meaning what it sounds like. It becomes "I beat my version of it."
+Numbers on papers give misleading scores if they are tested in different conditions.
 
 VisProbe pins the protocol per `(dataset, threat)` pair and validates it on every rank call.
 
@@ -67,18 +69,9 @@ Each RobustBench leaderboard has its own fixed evaluation:
 | `cifar10` / `L2` | autoattack-standard | 0.5 | 10000 | later |
 | `cifar10` / `corruptions` | *no attack — uses CIFAR-10-C* | n/a | per corruption | later |
 
-`autoattack-standard` is the full AutoAttack suite (APGD-CE + APGD-DLR + FAB + Square). The `corruptions` threat is a different evaluation entirely — the model is graded on pre-computed corrupted images rather than an adversary — so its protocol shape is fundamentally different and v3 doesn't cover it yet.
+`autoattack-standard` is the full AutoAttack suite (APGD-CE + APGD-DLR + FAB + Square). The `corruptions` threat is a different evaluation entirely: the model is graded on pre-computed corrupted images rather than an adversary. Its protocol shape is fundamentally different, so v3 doesn't cover it yet.
 
-### What the gate checks
-
-On every `compare_to_leaderboard()` call, VisProbe validates your `EvaluationResult` against the protocol for the requested `(dataset, threat)`:
-
-- `metadata.protocol == "robustbench"` — only `robustbench_eval()` sets this, so arbitrary `CompositionalExperiment` outputs can't accidentally claim a rank.
-- `attack` matches the expected attack for that threat.
-- `eps` matches the threat's eps (within float tolerance).
-- `n_samples` matches the protocol sample count.
-
-Any mismatch raises `ProtocolError` with the full list of violations and no attempt to approximate:
+Any mismatch (wrong attack, wrong eps, wrong sample count, missing protocol tag) raises `ProtocolError` with the full list of violations and no attempt to approximate:
 
 ```
 ProtocolError: Cannot rank against RobustBench cifar10/Linf — protocol mismatch:
@@ -116,7 +109,11 @@ results = experiment.run()                     # prints cost estimate; pass conf
 results.save("./results")
 ```
 
-Run both — the leaderboard rank tells you where you sit, the compositional sweep tells you what your deployment faces. In our pilot on CIFAR-10, **Wang2023, the #1 ranked model on RobustBench Linf, drops from 74% robust accuracy on clean inputs to 45% once Gaussian noise is added** (pilot: APGD-CE on 1000 samples — the strict-protocol leaderboard number is 71%). **Gowal2020 (~#30 on the leaderboard) ties Wang2023 under that noise condition** — the #1-vs-#30 distinction collapses on inputs any real camera would produce. The gap between official rank and compositional behavior is where the interesting failure modes hide. Full pilot table: [pilot_grid.csv](pilot_grid.csv).
+Run both. The leaderboard rank tells you where you sit on paper; the compositional sweep tells you what your deployment faces.
+
+**In our CIFAR-10 pilot, Wang2023 (RobustBench Linf #1) drops from 74% robust accuracy on clean inputs to 45% once Gaussian noise is added. Gowal2020 (~#30 on the leaderboard) ties Wang2023 under that same noise condition.** The #1-vs-#30 distinction collapses on inputs any real camera would produce.
+
+Pilot ran APGD-CE on 1000 samples; the strict-protocol leaderboard number for Wang2023 is 71%. Full table: [pilot_grid.csv](pilot_grid.csv).
 
 ## Install
 
