@@ -1,13 +1,12 @@
 # VisProbe Testing
 
-**Rank your vision model against the RobustBench leaderboard under their exact protocol — then find the real world failure modes the leaderboard doesn't measure.**
-
-Every robust-vision paper reports a "robust accuracy" number, and few are directly comparable unless the protocol matches exactly. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific — and your evaluation only matches them if you ran the *exact* same thing.
+Every robust-vision paper reports a "robust accuracy" number, and few are directly comparable unless the protocol matches exactly. Different sample counts. Different attack subsets. Different epsilons. Different test-time augmentations. The published rankings on RobustBench mean something specific and your evaluation only matches them if you ran the *exact* same thing.
 
 VisProbe does two things: a defensible rank, plus the failure modes the rank misses.
 
 1. **Compute a leaderboard rank under strict protocol enforcement.** You either match the RobustBench protocol byte-for-byte and get a comparable rank, or VisProbe refuses to produce one. No silent disagreement with the published numbers.
-2. **Sweep that same model across `environment × attack × severity`.** A model that ranks well on pristine images can collapse on inputs a real camera produces — those failure modes don't show up on the leaderboard. The rank tells you where you sit on paper; the sweep tells you what your users will actually hit.
+
+2. **Sweep that same model across `environment × attack × severity`.** A model that ranks well on pristine images can collapse on inputs a real camera produces and those failure modes don't show up on the leaderboard. The rank tells you where you sit on paper; the sweep tells you what your users will actually hit.
 
 ## 1. Where do I sit on the leaderboard?
 
